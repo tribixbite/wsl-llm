@@ -1,0 +1,8 @@
+# Set clean PATH first - prioritize WSL binaries over Windows
+export PATH=/usr/local/cuda-12.6/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/usr/lib/wsl/lib:$HOME/.local/bin:$HOME/.cargo/bin
+export LD_LIBRARY_PATH=/usr/local/cuda-12.6/lib64:$LD_LIBRARY_PATH
+
+# Source bashrc if it exists
+if [ -f ~/.bashrc ]; then
+    . ~/.bashrc
+fi
