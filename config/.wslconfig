@@ -1,0 +1,20 @@
+# WSL2 Configuration
+# Copy this file to C:\Users\[USERNAME]\.wslconfig
+# See: https://learn.microsoft.com/en-us/windows/wsl/wsl-config
+
+[wsl2]
+# Enable mirrored networking mode for LAN access
+# This makes WSL use the same network as Windows
+networkingMode=mirrored
+
+# DNS tunneling for better network performance
+dnsTunneling=true
+
+# Auto-proxy for better localhost resolution
+autoProxy=true
+
+# Memory limit (optional - adjust based on your needs)
+# memory=32GB
+
+# Processor limit (optional)
+# processors=12
