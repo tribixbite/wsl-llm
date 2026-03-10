@@ -2,25 +2,24 @@
 
 ## Project Location
 - **Repo**: `~/git/wsl-llm` (WSL Ubuntu-20.04, user `matilda`)
-- **Models**: `/mnt/c/Users/Will/.lmstudio/models/unsloth/` (Windows FS, symlinked to `~/models/`)
-- **llama.cpp**: `~/llama.cpp` (built from source, tag b8204, CUDA enabled)
+- **Models**: `~/models/` (native Linux FS for Qwen3.5, Windows FS symlinks for Coder-Next)
+- **ik_llama.cpp**: `~/ik_llama.cpp` (PRIMARY, built from source, CUDA + FA_ALL_QUANTS)
+- **llama.cpp**: `~/llama.cpp` (upstream, built from source, CUDA + FA_ALL_QUANTS)
 - **Python venv**: `~/bench_env` (PyTorch 2.10.0+cu130, vLLM 0.17.0rc1 nightly, llama-cpp-python 0.3.16)
 
 ## Hardware
-- 2x RTX 3090 (24GB each, 48GB total), Compute 8.6
+- 2x RTX 3090 (24GB each, 48GB total), Compute 8.6, PCIe (no NVLink)
 - 12c/24t CPU, 64GB DDR4
 - Windows 11 + WSL2 Ubuntu 22.04
 - NVIDIA Driver 591.74, CUDA 13.1, Toolkit 12.6
 
-## Current Models (as of March 6, 2026)
+## Current Models (as of March 9, 2026)
 
 | Model | File | Size | Architecture | Engine |
 |-------|------|------|-------------|--------|
-| Qwen3.5-35B-A3B | `Qwen3.5-35B-A3B-UD-Q4_K_XL.gguf` | 22.2 GB (20.7 GiB) | qwen35moe | llama.cpp |
-| Qwen3.5-35B-A3B | `Qwen/Qwen3.5-35B-A3B-GPTQ-Int4` (HF) | ~23 GB | qwen35moe | **vLLM** |
-| Qwen3-Coder-Next | `Qwen3-Coder-Next-UD-Q4_K_XL.gguf` | 44.6 GB (41.5 GiB) | qwen3next | llama.cpp |
-
-GGUF models use Unsloth Dynamic v2.0 quantization. GPTQ-Int4 is official Qwen safetensors (auto-downloaded by vLLM).
+| Qwen3.5-35B-A3B | `~/models/qwen35-q4.gguf` (Linux FS) | 20.7 GiB | qwen35moe | **ik_llama.cpp** |
+| Qwen3.5-35B-A3B | `Qwen/Qwen3.5-35B-A3B-GPTQ-Int4` (HF) | ~23 GB | qwen35moe | vLLM |
+| Qwen3-Coder-Next | `~/models/coder-next-q4.gguf` (symlink) | 41.5 GiB | qwen3next | llama.cpp |
 
 ## Environment Setup
 
@@ -32,7 +31,15 @@ export LD_LIBRARY_PATH="/usr/local/cuda-12.6/lib64:$LD_LIBRARY_PATH"
 ## Key Commands
 
 ```bash
-# vLLM Server (Qwen3.5 GPTQ, 105 t/s single / 155 t/s concurrent, BEST multi-user)
+# ik_llama.cpp Server (BEST: 122 t/s server TG, 131k ctx, 4 slots)
+~/ik_llama.cpp/build/bin/llama-server -m ~/models/qwen35-q4.gguf \
+  -ngl 99 -fa 1 -c 131072 -np 4 \
+  --cache-type-k bf16 --cache-type-v bf16 \
+  --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0.0 \
+  --host 0.0.0.0 --port 8080 --jinja \
+  --api-key "<your-api-key>" --alias "qwen3.5-35b-a3b"
+
+# vLLM Server (BEST concurrent: 155 t/s aggregate, but max 16k ctx)
 source ~/bench_env/bin/activate
 export HF_HOME=/mnt/c/Users/Will/.cache/huggingface
 export PYTHONPATH=/home/matilda/bench_env/lib/python3.10/site-packages:$PYTHONPATH
@@ -44,60 +51,64 @@ python -m vllm.entrypoints.openai.api_server \
   --host 0.0.0.0 --port 8080 \
   --language-model-only --enable-prefix-caching
 
-# llama.cpp Server (CUDA, Qwen3.5)
-~/llama.cpp/build/bin/llama-server -m ~/models/qwen35-q4.gguf \
-  -ngl 99 -fa on -c 8192 --host 0.0.0.0 --port 8080 --jinja
-
 # llama.cpp Server (CUDA, Coder-Next, dual-GPU, 90 t/s)
 ~/llama.cpp/build/bin/llama-server -m ~/models/coder-next-q4.gguf \
   -ngl 99 -fa on -c 16384 --host 0.0.0.0 --port 8080 --jinja
 
-# Benchmark (CUDA dual-GPU)
-~/llama.cpp/build/bin/llama-bench -m ~/models/qwen35-q4.gguf -ngl 99 -fa on -p 256,512,1024 -n 128
+# Cloudflare tunnel (llm.pet -> localhost:8080)
+cloudflared tunnel --config ~/.cloudflared/config.yml run wsl-llm
 ```
 
 ## Critical Notes
 
-- **vLLM GPTQ is best for concurrent** -- 105 t/s single, 155 t/s aggregate (vs llama.cpp 132 agg)
-- **vLLM needs nightly 0.17.0rc1+** -- v0.16.0 does NOT support Qwen3.5 architecture
-- **vLLM TP=2 is 7x slower** -- PCIe overhead kills MoE perf; always use TP=1
-- **vLLM enforce-eager is 7x slower** -- CUDA graphs essential for this model
-- **Vulkan beats CUDA for Qwen3.5 TG** (114 vs 98 t/s) because model fits on 1 GPU
-- **CUDA essential for Coder-Next** (90 vs 9 t/s) because it needs both GPUs
-- **Coder-Next impossible on vLLM** -- AWQ-4bit is 45.9GB, no room for KV cache in 48GB
-- **Vulkan dual-GPU is broken** -- always use `-ts 1,0` to force single GPU on Windows Vulkan
-- **b8204 changed `-fa` syntax** -- now requires `-fa on` not just `-fa`
-- **KV cache quant has no effect on speed** -- use Q4_0/fp8 freely for longer contexts
-- **Flash attention gives ~8% TG boost** on Vulkan (114 vs 105 t/s)
-- **Models are on Windows FS** (`/mnt/c/...`) via symlinks -- consider copying to Linux FS for better I/O
-- **WSL sudo password**: (not stored in repo — ask user)
+- **ik_llama.cpp is 2x faster** than upstream llama.cpp in server mode (122 vs 58 t/s)
+- **ik_llama.cpp graph splits = 3** vs upstream's 23 (key optimization)
+- **`-sm graph` is USELESS on PCIe** -- 10 t/s (only helps NVLink); always use layer split
+- **LLAMA_SET_ROWS=1 has no effect** on this model
+- **Smart Expert Reduction (-ser) has no effect** -- experts aren't the bottleneck
+- **vLLM GPTQ is best for high concurrency** -- 155 t/s aggregate (but max 16k ctx)
+- **vLLM needs nightly 0.17.0rc1+** -- v0.16.0 does NOT support Qwen3.5
+- **vLLM TP=2 is 7x slower** -- PCIe overhead; always use TP=1
+- **Coder-Next impossible on vLLM** -- AWQ-4bit is 45.9GB, no room for KV cache
+- **262k bf16 KV can crash Windows** -- uses ~30GB total, leaves no headroom
+- **Model on Linux FS** -- copied from Windows FS for better I/O
+- **Speculative decoding NOT supported** for Qwen3.5 MoE (GitHub Issue #20039)
+- **WSL sudo password**: (not stored in repo -- ask user)
 
 ## Sampling Parameters
 
-- **Qwen3.5 instruct**: temp=0.7, top_p=0.8, top_k=20
+- **Qwen3.5 Unsloth recommended**: temp=0.6, top_p=0.95, top_k=20
 - **Qwen3.5 thinking**: temp=1.0, top_p=0.95, top_k=20, presence_penalty=1.5
 - **Coder-Next**: temp=1.0, top_p=0.95, top_k=40, min_p=0.01
 
-## Next Steps (Pending)
+## Build Commands
 
-1. Wait for vLLM 0.17.0 stable release (currently using nightly)
-2. Test speculative decoding with MTP (multi-token prediction) on vLLM
-3. Test longer contexts (32k+) when vLLM adds better memory management
-4. Update llama.cpp when newer builds improve Vulkan multi-GPU
-5. Update LM Studio to v0.4.6, Ollama to latest
-6. Consider copying models to Linux FS for better I/O
+```bash
+# ik_llama.cpp (requires cmake 3.25+: pip install cmake --user)
+cd ~/ik_llama.cpp
+~/.local/bin/cmake -B build -DGGML_NATIVE=ON -DGGML_CUDA=ON \
+  -DGGML_CUDA_FA_ALL_QUANTS=ON -DCMAKE_CUDA_ARCHITECTURES=86 \
+  -DCMAKE_CUDA_COMPILER=/usr/local/cuda-12.6/bin/nvcc
+~/.local/bin/cmake --build build -j$(nproc)
+
+# upstream llama.cpp
+cd ~/llama.cpp
+cmake -B build -DGGML_CUDA=ON -DGGML_CUDA_FA_ALL_QUANTS=ON -DCMAKE_CUDA_ARCHITECTURES=86
+cmake --build build -j$(nproc)
+```
 
 ## File Structure
 
 ```
 ~/git/wsl-llm/          # This repo
-~/llama.cpp/             # llama.cpp b8204 (CUDA build)
-~/models/                # Symlinks to Windows model files
-  qwen35-q4.gguf        -> /mnt/c/Users/Will/.lmstudio/models/unsloth/Qwen3.5-35B-A3B-GGUF/...
-  coder-next-q4.gguf    -> /mnt/c/Users/Will/.lmstudio/models/unsloth/Qwen3-Coder-Next-GGUF/...
-~/bench_env/             # Python venv (vLLM 0.17.0rc1, PyTorch 2.10, llama-cpp-python)
-~/server_bench.py        # Server benchmark script
-/mnt/c/Users/Will/.cache/huggingface/  # HF model cache (GPTQ-Int4 safetensors)
+~/ik_llama.cpp/          # ik_llama.cpp fork (PRIMARY, 2x faster server)
+~/llama.cpp/             # Upstream llama.cpp (CUDA build)
+~/models/
+  qwen35-q4.gguf        # Native Linux FS copy (20.7 GiB)
+  coder-next-q4.gguf    -> /mnt/c/.../Qwen3-Coder-Next-GGUF/... (symlink)
+~/bench_env/             # Python venv (vLLM 0.17.0rc1, PyTorch 2.10)
+~/.cloudflared/          # Cloudflare tunnel config + credentials
+/mnt/c/Users/Will/.cache/huggingface/  # HF model cache (GPTQ-Int4)
 ```
 
 ## Reference Docs
