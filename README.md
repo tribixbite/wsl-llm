@@ -123,8 +123,10 @@ After install, run in an admin PowerShell once:
 
 ## Docs
 
-- **[Qwen 3.6 Benchmark Report](docs/QWEN36_BENCHMARKS.md)** ⭐ — Comprehensive benchmark of all 5 TurboQuant forks, plain vs imatrix vs UD-Q4_K_XL quants, and from-scratch install commands
-- [Game of Life HTMLs](bench/results/gol_full/) — Visual side-by-side outputs from 8 quant/engine variants
+- **[Qwen 3.6 35B-A3B Benchmark Report](docs/QWEN36_BENCHMARKS.md)** ⭐ — Comprehensive benchmark of all 5 TurboQuant forks, plain vs imatrix vs UD-Q4_K_XL quants, and from-scratch install commands
+- **[Qwen 3.6 27B Dense Benchmark Report](docs/QWEN36_27B_BENCHMARKS.md)** ⭐ — Madreag fork + vLLM MTP speculative decoding, 11 configs tested, 54 t/s speed champion via vLLM + Lorbus AutoRound INT4 + MTP n=3
+- [35B-A3B GoL HTMLs](bench/results/gol_full/) — 8 quant/engine variants
+- [27B Dense GoL HTMLs](bench/results/qwen36-27b/gol/) — 10 backend×config variants
 - [Architecture](docs/architecture.md) — System design and lessons learned
 - [Networking](docs/networking.md) — LAN access, firewall, tunnel setup
 - [Earlier Benchmarks](docs/BENCHMARKS.md) — Qwen 3.5 era results

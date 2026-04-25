@@ -38,10 +38,18 @@ llm info                # System info (GPU, PCIe, engines)
 
 | Model | File | Size | Architecture | Engine |
 |-------|------|------|-------------|--------|
-| **Qwen3.6-35B-A3B** ⭐ | `~/models/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf` | 22.4 GiB | qwen3.6 MoE (10 attn + 30 DeltaNet, head_dim=128) | **Madreag turboquant** |
+| **Qwen3.6-35B-A3B** ⭐ (daily driver) | `~/models/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf` | 22.4 GiB | qwen3.6 MoE (10 attn + 30 DeltaNet, head_dim=128, 3B active) | **Madreag turboquant** |
+| Qwen3.6-27B (deep-thinking option) | `~/models/Qwen3.6-27B-UD-Q4_K_XL.gguf` | 17.6 GiB | qwen3.6 Dense hybrid (16 attn + 48 DeltaNet, head_dim=256, 27B all-active) | Madreag turboquant or vLLM+MTP |
+| Qwen3.6-27B (smaller/faster) | `~/models/Qwen3.6-27B-IQ4_XS.gguf` | 15.4 GiB | same arch | Madreag turboquant |
+| Qwen3.6-27B (vLLM MTP target) | `~/models/Lorbus-Qwen3.6-27B-int4-AutoRound/` | ~14 GiB | INT4 + BF16 MTP head | **vLLM nightly** |
 | Qwen3.6-35B-A3B (legacy plain Q4) | `~/models/Qwen_Qwen3.6-35B-A3B-Q4_0.gguf` (bartowski) | 19 GiB | qwen3.6 MoE | any |
 | Qwen3.5-35B-A3B (legacy) | `~/models/qwen35-q4.gguf` | 20.7 GiB | qwen35moe | ik_llama.cpp |
 | Qwen3-Coder-Next | `~/models/coder-next-q4.gguf` | 41.5 GiB | qwen3next | llama.cpp |
+
+**When to use which model:**
+- Qwen3.6-35B-A3B: daily coding, chat, edits — ~102 t/s @ 262k ctx via Madreag turboquant. 3B active params makes it very fast.
+- Qwen3.6-27B + Madreag: hard one-shot coding tasks where quality matters — ~20 t/s but Sonnet 4.6-tier output (per Qwen). Same simple stack as 35B.
+- Qwen3.6-27B + vLLM + MTP: serious 27B throughput — ~54 t/s @ 262k via speculative decoding. More complex setup, see `scripts/setup-vllm-27b.sh`.
 
 ## Services (systemd, autostart on boot)
 
@@ -210,8 +218,10 @@ install -m 0755 build/bin/llama-server ~/llama-cpp-turboquant/llama-server
 
 ## Reference Docs
 
-- `docs/QWEN36_BENCHMARKS.md` — **Comprehensive Qwen 3.6 benchmark report** including Madreag turboquant fork analysis, 5 TurboQuant fork comparison, and from-scratch install commands ⭐
-- `bench/results/gol_full/` — Conway's Game of Life HTML outputs from 8 quant/engine variants (visual comparison of generation quality)
+- `docs/QWEN36_BENCHMARKS.md` — **Comprehensive Qwen 3.6 35B-A3B benchmark report** including Madreag turboquant fork analysis, 5 TurboQuant fork comparison, and from-scratch install commands ⭐
+- `docs/QWEN36_27B_BENCHMARKS.md` — **Qwen 3.6 27B Dense benchmark report**: 11 configs across Madreag fork + vLLM nightly + MTP speculative decoding, with vLLM+MTP@262k as speed champion (~54 t/s) ⭐
+- `bench/results/gol_full/` — 35B-A3B Conway's Game of Life HTML outputs (8 fork variants)
+- `bench/results/qwen36-27b/gol/` — 27B Dense Conway's Game of Life HTML outputs (10 backend×config variants)
 - `docs/BENCHMARKS.md` — Earlier benchmark results (Qwen 3.5)
 - `docs/OPTIMIZATION_FINDINGS.md` — What we tried and what works (Qwen 3.5)
 - `docs/architecture.md` — System design, VRAM budget, CUDA crash analysis
