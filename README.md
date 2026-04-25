@@ -1,226 +1,135 @@
-# WSL LLM Setup - Qwen3-Coder-Next
+# WSL-LLM
 
-Complete setup for running Qwen3-Coder-Next (80B MoE) on WSL2 with NVIDIA GPUs using llama.cpp.
+Local LLM inference stack for WSL2 with NVIDIA GPUs. Runs **Qwen3.6-35B-A3B at ~102 t/s with full 262k context** on a single RTX 3090, using [Madreag's TurboQuant CUDA fork](https://github.com/Madreag/turbo3-cuda) (turbo3 KV cache compression).
 
-## Hardware Requirements
+**Stack:** Madreag turboquant → LiteLLM proxy → Open WebUI (+ optional Cloudflare tunnel)
 
-- **GPU**: 2x NVIDIA RTX 3090 (48GB VRAM total) or similar
-- **OS**: Windows 11 with WSL2
-- **Driver**: NVIDIA 591.74+ (supports CUDA 13.1)
-- **Storage**: ~50GB for models + llama.cpp
+See [docs/QWEN36_BENCHMARKS.md](docs/QWEN36_BENCHMARKS.md) for the comprehensive benchmark report behind the engine and quant choices.
 
 ## Quick Start
 
-### Windows (Easiest)
-```cmd
-windows-scripts\qwen-start.bat      # Start server
-windows-scripts\qwen-status.bat     # Check status
-windows-scripts\qwen-stop.bat       # Stop server
-```
-
-### WSL/Linux
 ```bash
-./scripts/start-qwen.sh    # Start
-./scripts/status-qwen.sh   # Status
-./scripts/stop-qwen.sh     # Stop
+git clone https://github.com/YOUR_USER/wsl-llm.git
+cd wsl-llm
+./install.sh
 ```
 
-### Access
-- **Local**: http://localhost:8080
-- **API Docs**: http://localhost:8080/docs
-- **Health**: http://localhost:8080/health
+The installer handles everything: builds engines, downloads the model, sets up Docker containers, installs systemd services, and configures passwordless management.
 
-## Installation
+### Options
 
-### 1. Fix WSL PATH (Important!)
 ```bash
-# Copy config
-sudo cp config/wsl.conf /etc/wsl.conf
-cp config/bash_profile ~/.bash_profile
-
-# Restart WSL
-wsl --shutdown
-wsl
+./install.sh --admin-user myname --admin-password mypass     # Set admin credentials
+./install.sh --domain llm.example.com                         # Enable Cloudflare tunnel
+./install.sh --skip-build --skip-model                        # Config-only reinstall
+./install.sh --yes                                            # Non-interactive
 ```
 
-### 2. Install Dependencies
+## What Gets Installed
+
+| Component | Port | Description |
+|-----------|------|-------------|
+| Madreag turboquant | 8080 | Inference server (turbo3 KV → full 262k ctx at ~100 t/s) |
+| LiteLLM | 4000 | OpenAI-compatible proxy with API key management |
+| Open WebUI | 3000 | ChatGPT-like web interface |
+| PostgreSQL | 5434 | LiteLLM database (Docker) |
+| Cloudflare tunnel | — | Optional public access |
+| Watchdog | — | Auto-restarts on CUDA crashes |
+
+All services auto-start on boot via systemd.
+
+## Management
+
 ```bash
-# Build tools
-sudo apt update
-sudo apt install -y build-essential cmake git curl wget
-
-# CUDA toolkit (development only, NO driver)
-wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
-sudo dpkg -i cuda-keyring_1.1-1_all.deb
-sudo apt update
-sudo apt install -y cuda-toolkit-12-6
-
-# Hugging Face CLI
-pip3 install --upgrade huggingface_hub[cli,hf_transfer]
+llm status              # All services + GPU state
+llm health              # Health check endpoints
+llm restart             # Restart llama-server
+llm logs                # Tail server logs
+llm config edit         # Edit server config (context, model, sampling)
+llm bench quick         # Performance benchmark
+llm model list          # Available models
+llm model switch FILE   # Switch model
+llm key create USER     # Create API key for a user
+llm info                # System info (GPU, PCIe, engines)
+llm update              # Pull latest + rebuild
 ```
 
-### 3. Build llama.cpp
-```bash
-cd ~
-git clone https://github.com/ggml-org/llama.cpp
-cmake -S llama.cpp -B llama.cpp/build -DBUILD_SHARED_LIBS=OFF -DGGML_CUDA=ON -DCMAKE_BUILD_TYPE=Release
-cmake --build llama.cpp/build --config Release -j --target llama-server
-```
+## Hardware Requirements
 
-### 4. Download Model
-```bash
-# Q3_K_XL (36GB) - Recommended for 128k context
-huggingface-cli download unsloth/Qwen3-Coder-Next-GGUF \
-  Qwen3-Coder-Next-UD-Q3_K_XL.gguf \
-  --local-dir ~/unsloth/Qwen3-Coder-Next-GGUF
-
-# Q4_K_XL (46GB) - Better quality, less context
-huggingface-cli download unsloth/Qwen3-Coder-Next-GGUF \
-  Qwen3-Coder-Next-UD-Q4_K_XL.gguf \
-  --local-dir ~/unsloth/Qwen3-Coder-Next-GGUF
-```
-
-### 5. Install Scripts
-```bash
-# From this repo root
-cp scripts/*.sh ~/
-chmod +x ~/*.sh
-
-# Optional: systemd service
-sudo cp config/qwen-server.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable qwen-server
-```
+- **GPU:** 1-2 NVIDIA GPUs with 24GB+ VRAM each (tested: 2x RTX 3090)
+- **CPU:** Any modern x86_64 (tested: Ryzen 9 5900X)
+- **RAM:** 32GB+ recommended
+- **OS:** Windows 11 + WSL2 Ubuntu 22.04+
+- **CUDA:** Toolkit 12.x (driver provided by Windows)
 
 ## Configuration
 
-### Current Setup
-- **Model**: Q3_K_XL (35.78 GB, 3.86 BPW)
-- **Context**: 128k tokens (131,072)
-- **VRAM Usage**: ~44.6 GB / 48 GB
-- **Generation Speed**: ~34.6 tokens/second
-- **Flash Attention**: Enabled
+Edit `~/llama-server.conf` then `llm restart`:
 
-### Increase Context to 256k
-Edit start scripts and change:
 ```bash
---ctx-size 131072  →  --ctx-size 262144
+LLAMA_BIN=~/llama-cpp-turboquant/llama-server   # Madreag fork
+MODEL=~/models/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf
+CONTEXT_SIZE=262144      # Full long context, single slot
+NUM_SLOTS=1
+KV_TYPE_K=turbo3         # TurboQuant 3.125 bpv (~5x compression vs q8_0)
+KV_TYPE_V=turbo3
+REASONING_BUDGET=0       # 0=thinking off by default
 ```
-Note: May require KV cache quantization or smaller model.
 
-### Switch to Q4 Model (Better Quality)
-Edit start scripts:
-```bash
-Qwen3-Coder-Next-UD-Q3_K_XL.gguf  →  Qwen3-Coder-Next-UD-Q4_K_XL.gguf
---ctx-size 131072  →  --ctx-size 65536  # Reduce context
-```
+### Sampling Presets (Qwen/Unsloth Official)
+
+| Mode | temp | top_p | top_k | min_p | presence_penalty |
+|------|-----:|------:|------:|------:|-----------------:|
+| Non-thinking coding | 0.6 | 0.95 | 20 | 0.0 | 0.0 |
+| Non-thinking general | 0.7 | 0.8 | 20 | 0.0 | 1.5 |
+| Thinking coding | 0.6 | 0.95 | 20 | 0.0 | 0.0 |
+| Thinking general | 1.0 | 0.95 | 20 | 0.0 | 1.5 |
 
 ## API Usage
 
-### Completions (OpenAI-compatible)
 ```bash
-curl http://localhost:8080/v1/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "prompt": "def fibonacci(n):\n",
-    "max_tokens": 100,
-    "temperature": 0.7
-  }'
-```
-
-### Chat
-```bash
+# Direct (llama-server)
 curl http://localhost:8080/v1/chat/completions \
+  -H "Authorization: Bearer YOUR_KEY" \
   -H "Content-Type: application/json" \
-  -d '{
-    "messages": [
-      {"role": "system", "content": "You are a helpful coding assistant."},
-      {"role": "user", "content": "Write a Python function to check if a number is prime"}
-    ],
-    "max_tokens": 200
-  }'
+  -d '{"model":"qwen3.6-35b-a3b","messages":[{"role":"user","content":"Hello"}]}'
+
+# Via LiteLLM (recommended — rate limiting, key management)
+curl http://localhost:4000/v1/chat/completions \
+  -H "Authorization: Bearer sk-your-litellm-key" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"qwen3.6-35b-a3b","messages":[{"role":"user","content":"Hello"}]}'
 ```
 
-### Python
-```python
-import openai
+## Windows Setup
 
-openai.api_base = "http://localhost:8080/v1"
-openai.api_key = "dummy"
+After install, run in an admin PowerShell once:
 
-response = openai.ChatCompletion.create(
-    model="Qwen3-Coder-Next",
-    messages=[{"role": "user", "content": "Write hello world in Python"}]
-)
-print(response.choices[0].message.content)
+```powershell
+.\windows\setup-autostart.ps1    # Auto-start WSL + port forwarding on boot
 ```
 
-## Monitoring
+### BIOS Recommendations (for stability)
 
-### GPU Usage
+- Disable ASPM (prevents GPU idle crash)
+- Enable Above 4G Decoding + ReBAR
+- Increase TDR timeout: see `windows/setup-windows.ps1`
+
+## Uninstall
+
 ```bash
-wsl nvidia-smi
-wsl watch -n 1 nvidia-smi  # Real-time
+./uninstall.sh
 ```
 
-### Server Logs
-```bash
-wsl tail -f ~/qwen-server.log
-```
+## Docs
 
-### Metrics
-```bash
-curl http://localhost:8080/metrics
-curl http://localhost:8080/slots
-```
-
-## Troubleshooting
-
-### Server won't start
-```bash
-# Check port
-wsl netstat -tulpn | grep 8080
-
-# Check CUDA
-wsl nvidia-smi
-
-# Check logs
-wsl tail -f ~/qwen-server.log
-```
-
-### Out of memory
-- Reduce context size: `--ctx-size 65536`
-- Switch to Q3 or Q2 model
-- Close other GPU applications
-
-### Slow inference
-- Check GPU utilization: `wsl nvidia-smi`
-- Ensure Flash Attention enabled (check logs)
-- Verify both GPUs are being used
-
-## Documentation
-
-- [SETUP_GUIDE.md](docs/SETUP_GUIDE.md) - Complete setup walkthrough
-- [IMPROVEMENTS.md](docs/IMPROVEMENTS.md) - Web UIs, monitoring, security
-- [claude.md](docs/claude.md) - Detailed learnings and architecture notes
-
-## Architecture
-
-- **Model**: Qwen3-Coder-Next (80B MoE, 512 experts, 10 active)
-- **Backend**: llama.cpp with CUDA support
-- **Quantization**: GGUF Q3_K or Q4_K
-- **Context**: RoPE with 5M base frequency
-- **Attention**: Flash Attention v2
-- **Multi-GPU**: Automatic layer distribution
-
-## Links
-
-- Qwen Model: https://huggingface.co/unsloth/Qwen3-Coder-Next-GGUF
-- llama.cpp: https://github.com/ggml-org/llama.cpp
-- Unsloth Docs: https://unsloth.ai/docs
+- **[Qwen 3.6 Benchmark Report](docs/QWEN36_BENCHMARKS.md)** ⭐ — Comprehensive benchmark of all 5 TurboQuant forks, plain vs imatrix vs UD-Q4_K_XL quants, and from-scratch install commands
+- [Game of Life HTMLs](bench/results/gol_full/) — Visual side-by-side outputs from 8 quant/engine variants
+- [Architecture](docs/architecture.md) — System design and lessons learned
+- [Networking](docs/networking.md) — LAN access, firewall, tunnel setup
+- [Earlier Benchmarks](docs/BENCHMARKS.md) — Qwen 3.5 era results
+- [Earlier Optimization](docs/OPTIMIZATION_FINDINGS.md) — Qwen 3.5 findings
 
 ## License
 
-Configuration files and scripts: MIT
-Qwen3 Model: Apache 2.0
-llama.cpp: MIT
+Scripts and configuration: MIT. Models: see respective licenses (Qwen: Apache 2.0).
