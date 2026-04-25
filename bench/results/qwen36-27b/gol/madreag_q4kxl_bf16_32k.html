@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conway's Game of Life - RLE</title>
+    <style>
+        :root {
+            --bg-color: #f0f2f5;
+            --panel-bg: #ffffff;
+            --text-color: #333;
+            --accent-color: #007bff;
+            --accent-hover: #0056b3;
+            --danger-color: #dc3545;
+            --danger-hover: #c82333;
+            --border-color: #ccc;
+            --cell-alive: #007bff;
+            --cell-dead: #ffffff;
+            --grid-line: #e0e0e0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        header {
+            background-color: var(--panel-bg);
+            width: 100%;
+            padding: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.2rem;
+            margin-right: 20px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+            background-color: var(--accent-color);
+            color: white;
+        }
+
+        button:hover {
+            background-color: var(--accent-hover);
+        }
+
+        button.secondary {
+            background-color: #6c757d;
+        }
+        button.secondary:hover {
+            background-color: #5a6268;
+        }
+
+        button.danger {
+            background-color: var(--danger-color);
+        }
+        button.danger:hover {
+            background-color: var(--danger-hover);
+        }
+
+        .status-bar {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: #666;
+            display: flex;
+            gap: 20px;
+        }
+
+        #error-msg {
+            color: var(--danger-color);
+            font-weight: bold;
+        }
+
+        .canvas-container {
+            flex: 1;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: auto;
+            position: relative;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        canvas {
+            background-color: var(--cell-dead);
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            cursor: crosshair;
+            /* Ensure crisp rendering */
+            image-rendering: pixelated; 
+        }
+
+        .instructions {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(255,255,255,0.8);
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Game of Life</h1>
+    <div class="controls">
+        <button id="btn-toggle">Start</button>
+        <button id="btn-step" class="secondary">Step</button>
+        <button id="btn-reset" class="secondary">Reset</button>
+        <button id="btn-clear" class="danger">Clear</button>
+    </div>
+    <div class="status-bar">
+        <span id="status-text">Paused</span>
+        <span id="error-msg"></span>
+    </div>
+</header>
+
+<div class="canvas-container">
+    <canvas id="life-canvas"></canvas>
+    <div class="instructions">
+        Space: Play/Pause | S: Step | R: Reset | C: Clear
+    </div>
+</div>
+
+<script>
+/**
+ * Configuration & State
+ */
+const CELL_SIZE = 15;
+const COLOR_ALIVE = '#007bff';
+const COLOR_DEAD = '#ffffff';
+const COLOR_GRID = '#e0e0e0';
+
+// Default Pattern (Glider)
+const DEFAULT_RLE = "2b2o!3o!o!";
+
+let state = {
+    grid: [],
+    rows: 0,
+    cols: 0,
+    isRunning: false,
+    initialHash: '', // To store the state at start/reset
+    lastUpdate: 0,
+    speed: 100 // ms per tick
+};
+
+// DOM Elements
+const canvas = document.getElementById('life-canvas');
+const ctx = canvas.getContext('2d');
+const btnToggle = document.getElementById('btn-toggle');
+const btnStep = document.getElementById('btn-step');
+const btnReset = document.getElementById('btn-reset');
+const btnClear = document.getElementById('btn-clear');
+const statusText = document.getElementById('status-text');
+const errorMsg = document.getElementById('error-msg');
+
+/**
+ * RLE Parser
+ * Parses "3o2b1o!2b3o" into a 2D array of booleans.
+ */
+function parseRLE(rleString) {
+    if (!rleString || rleString.trim() === '') return [];
+    
+    const rows = [];
+    let currentRow = [];
+    let count = 0;
+    let multiplier = false; // Flag to check if we have a number pending
+
+    // Clean up string (remove spaces, newlines, etc.)
+    const cleanStr = rleString.replace(/[\s\n\r]/g, '');
+
+    for (let i = 0; i < cleanStr.length; i++) {
+        const char = cleanStr[i];
+
+        if (char >= '0' && char <= '9') {
+            count = count * 10 + parseInt(char, 10);
+            multiplier = true;
+        } else if (char === 'o' || char === 'b') {
+            const isAlive = (char === 'o');
+            const repeat = multiplier ? count : 1;
+            
+            for (let k = 0; k < repeat; k++) {
+                currentRow.push(isAlive);
+            }
+            count = 0;
+            multiplier = false;
+        } else if (char === '!') {
+            rows.push(currentRow);
+            currentRow = [];
+            count = 0;
+            multiplier = false;
+        } else if (char === '#') {
+            // Skip comments (simple implementation: skip until end of line or valid char)
+            // For this specific requirement, we assume standard RLE without complex comments
+            // but basic skip logic handles stray characters if needed.
+            continue; 
+        } else {
+            // Unknown character, ignore or error? Ignoring for robustness.
+            continue;
+        }
+    }
+
+    // Push the last row if it wasn't terminated by !
+    if (currentRow.length > 0) {
+        rows.push(currentRow);
+    }
+
+    return rows;
+}
+
+/**
+ * Normalize Grid
+ * Pads rows to make the grid rectangular.
+ */
+function normalizeGrid(rows) {
+    if (rows.length === 0) return [];
+    
+    let maxCols = 0;
+    rows.forEach(row => {
+        if (row.length > maxCols) maxCols = row.length;
+    });
+
+    // Pad rows
+    const normalized = rows.map(row => {
+        const padded = [...row];
+        while (padded.length < maxCols) {
+            padded.push(false);
+        }
+        return padded;
+    });
+
+    return normalized;
+}
+
+/**
+ * Game Logic
+ */
+function initGame(rleString) {
+    try {
+        const rawRows = parseRLE(rleString);
+        if (rawRows.length === 0) {
+            // Empty RLE results in empty grid
+            state.grid = [];
+            state.rows = 0;
+            state.cols = 0;
+        } else {
+            state.grid = normalizeGrid(rawRows);
+            state.rows = state.grid.length;
+            state.cols = state.grid[0].length;
+        }
+        
+        state.initialHash = rleString; // Store for reset
+        errorMsg.textContent = '';
+        resizeCanvas();
+        draw();
+    } catch (e) {
+        console.error(e);
+        errorMsg.textContent = "Error parsing RLE: " + e.message;
+        // Fallback to default on error
+        initGame(DEFAULT_RLE);
+    }
+}
+
+function generateRLE(grid) {
+    if (!grid || grid.length === 0) return "";
+
+    let rle = "";
+    let rowStr = "";
+    
+    for (let y = 0; y < grid.length; y++) {
+        let count = 0;
+        let currentType = null; // 'o' or 'b'
+        
+        for (let x = 0; x < grid[y].length; x++) {
+            const type = grid[y][x] ? 'o' : 'b';
+            
+            if (type === currentType) {
+                count++;
+            } else {
+                // Flush previous
+                if (count > 0) {
+                    if (count > 1) rowStr += count;
+                    rowStr += currentType;
+                }
+                currentType = type;
+                count = 1;
+            }
+        }
+        // Flush last cell of row
+        if (count > 0) {
+            if (count > 1) rowStr += count;
+            rowStr += currentType;
+        }
+        
+        rle += rowStr + "!";
+        rowStr = "";
+    }
+    return rle;
+}
+
+function updateURL(rleString) {
+    // Use replaceState to update hash without adding to history stack
+    // This prevents the "feedback loop" of back-button navigation or hashchange events triggering re-parsing
+    history.replaceState(null, null, `#${rleString}`);
+}
+
+function computeNextGeneration() {
+    if (state.rows === 0 || state.cols === 0) return;
+
+    const newGrid = Array(state.rows).fill(null).map(() => Array(state.cols).fill(false));
+
+    for (let y = 0; y < state.rows; y++) {
+        for (let x = 0; x < state.cols; x++) {
+            let neighbors = 0;
+            // Check 8 neighbors
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    if (dx === 0 && dy === 0) continue;
+                    
+                    const ny = y + dy;
+                    const nx = x + dx;
+
+                    if (ny >= 0 && ny < state.rows && nx >= 0 && nx < state.cols) {
+                        if (state.grid[ny][nx]) neighbors++;
+                    }
+                }
+            }
+
+            const isAlive = state.grid[y][x];
+            if (isAlive) {
+                newGrid[y][x] = (neighbors === 2 || neighbors === 3);
+            } else {
+                newGrid[y][x] = (neighbors === 3);
+            }
+        }
+    }
+    state.grid = newGrid;
+}
+
+/**
+ * Rendering
+ */
+function resizeCanvas() {
+    if (state.rows === 0 || state.cols === 0) {
+        canvas.width = 0;
+        canvas.height = 0;
+        return;
+    }
+    canvas.width = state.cols * CELL_SIZE;
+    canvas.height = state.rows * CELL_SIZE;
+}
+
+function draw() {
+    // Clear background
+    ctx.fillStyle = COLOR_DEAD;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (state.rows === 0) return;
+
+    // Draw Grid Lines (Optional, helps visualize cells)
+    ctx.strokeStyle = COLOR_GRID;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = 0; x <= state.cols; x++) {
+        ctx.moveTo(x * CELL_SIZE, 0);
+        ctx.lineTo(x * CELL_SIZE, canvas.height);
+    }
+    for (let y = 0; y <= state.rows; y++) {
+        ctx.moveTo(0, y * CELL_SIZE);
+        ctx.lineTo(canvas.width, y * CELL_SIZE);
+    }
+    ctx.stroke();
+
+    // Draw Alive Cells
+    ctx.fillStyle = COLOR_ALIVE;
+    for (let y = 0; y < state.rows; y++) {
+        for (let x = 0; x < state.cols; x++) {
+            if (state.grid[y][x]) {
+                // Draw slightly smaller than cell size for grid effect
+                ctx.fillRect(x * CELL_SIZE + 1, y * CELL_SIZE + 1, CELL_SIZE - 2, CELL_SIZE - 2);
+            }
+        }
+    }
+}
+
+/**
+ * Controls & Loop
+ */
+function startLoop() {
+    state.isRunning = true;
+    btnToggle.textContent = "Pause";
+    statusText.textContent = "Running";
+    requestAnimationFrame(gameLoop);
+}
+
+function stopLoop() {
+    state.isRunning = false;
+    btnToggle.textContent = "Start";
+    statusText.textContent = "Paused";
+}
+
+function gameLoop(timestamp) {
+    if (!state.isRunning) return;
+
+    if (timestamp - state.lastUpdate > state.speed) {
+        computeNextGeneration();
+        draw();
+        const rle = generateRLE(state.grid);
+        updateURL(rle);
+        state.lastUpdate = timestamp;
+    }
+    
+    requestAnimationFrame(gameLoop);
+}
+
+function step() {
+    stopLoop();
+    computeNextGeneration();
+    draw();
+    const rle = generateRLE(state.grid);
+    updateURL(rle);
+}
+
+function reset() {
+    stopLoop();
+    initGame(state.initialHash);
+}
+
+function clearGrid() {
+    stopLoop();
+    state.grid = [];
+    state.rows = 0;
+    state.cols = 0;
+    resizeCanvas();
+    draw();
+    updateURL("");
+}
+
+function toggleCell(x, y) {
+    if (state.rows === 0 || state.cols === 0) return;
+    
+    // Bounds check
+    if (x >= 0 && x < state.cols && y >= 0 && y < state.rows) {
+        state.grid[y][x] = !state.grid[y][x];
+        draw();
+        const rle = generateRLE(state.grid);
+        updateURL(rle);
+    }
+}
+
+/**
+ * Event Listeners
+ */
+// Mouse Interaction
+canvas.addEventListener('mousedown', (e) => {
+    if (state.isRunning) return; // Disable click editing while running
+    
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.floor((e.clientX - rect.left) / CELL_SIZE);
+    const y = Math.floor((e.clientY - rect.top) / CELL_SIZE);
+    toggleCell(x, y);
+});
+
+// Button Interaction
+btnToggle.addEventListener('click', () => {
+    if (state.isRunning) stopLoop();
+    else startLoop();
+});
+
+btnStep.addEventListener('click', step);
+btnReset.addEventListener('click', reset);
+btnClear.addEventListener('click', clearGrid);
+
+// Keyboard Interaction
+document.addEventListener('keydown', (e) => {
+    // Ignore if user is typing in an input (none currently, but good practice)
+    if (e.target.tagName === 'INPUT') return;
+
+    switch(e.code) {
+        case 'Space':
+            e.preventDefault(); // Prevent scrolling
+            if (state.isRunning) stopLoop();
+            else startLoop();
+            break;
+        case 'KeyS':
+            step();
+            break;
+        case 'KeyR':
+            reset();
+            break;
+        case 'KeyC':
+            clearGrid();
+            break;
+    }
+});
+
+/**
+ * Initialization
+ */
+window.addEventListener('load', () => {
+    const hash = window.location.hash.substring(1);
+    const rle = hash || DEFAULT_RLE;
+    initGame(rle);
+});
+
+// Handle browser back/forward navigation to restore state
+window.addEventListener('hashchange', () => {
+    const hash = window.location.hash.substring(1);
+    // Only parse if it looks like valid RLE or empty, otherwise ignore
+    if (hash !== undefined) {
+        initGame(hash);
+    }
+});
+
+</script>
+</body>
+</html>

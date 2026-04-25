@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conway's Game of Life</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #111;
+            color: #eee;
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #controls {
+            padding: 10px;
+            background: #222;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+
+        button {
+            background: #444;
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #666;
+        }
+
+        button:active {
+            background: #888;
+        }
+
+        #status {
+            height: 20px;
+            margin-top: 5px;
+            color: #ff6b6b;
+            font-size: 14px;
+            text-align: center;
+            min-height: 1.5em;
+        }
+
+        #canvas-container {
+            flex-grow: 1;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: auto;
+            cursor: crosshair;
+        }
+
+        canvas {
+            background-color: #000;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="controls">
+        <button id="btn-pause">Start/Pause (Space)</button>
+        <button id="btn-step">Step (S)</button>
+        <button id="btn-reset">Reset (R)</button>
+        <button id="btn-clear">Clear (C)</button>
+    </div>
+    <div id="status"></div>
+    <div id="canvas-container">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+<script>
+/**
+ * Configuration
+ */
+const CELL_SIZE = 20;
+const COLOR_ALIVE = '#00ff00';
+const COLOR_DEAD = '#000000';
+
+/**
+ * State
+ */
+let grid = [];
+let cols = 0;
+let rows = 0;
+let isRunning = false;
+let animationId = null;
+let initialGrid = []; // To support reset
+let lastTickTime = 0;
+const FPS = 10;
+
+// DOM Elements
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const statusEl = document.getElementById('status');
+
+/**
+ * Core Logic: RLE Parser
+ * Requirements:
+ * - Digit prefix N means next char repeated N times.
+ * - 'o' = live, 'b' = dead.
+ * - '!' = end of row.
+ * - Optional digit (defaults to 1).
+ */
+function parseRLE(rleString) {
+    // Clean input: remove whitespace, comments (;), newlines
+    const cleanStr = rleString.replace(/[\s;]|[\n\r]/g, '');
+    
+    const parsedRows = [];
+    let currentRow = [];
+    let i = 0;
+    let countStr = '';
+
+    while (i < cleanStr.length) {
+        const char = cleanStr[i];
+
+        if (!isNaN(parseInt(char)) && isFinite(parseInt(char))) {
+            // Accumulate digits
+            countStr += char;
+        } else if (char === 'o' || char === 'b') {
+            // Determine count
+            let count = countStr ? parseInt(countStr) : 1;
+            countStr = ''; // Reset count buffer
+
+            // Push cells
+            for (let k = 0; k < count; k++) {
+                currentRow.push(char === 'o' ? 1 : 0);
+            }
+        } else if (char === '!') {
+            // End of row
+            if (countStr) {
+                // If there was a pending number before '!', it implies 'b' (dead cells) usually, 
+                // but strictly per spec "digit prefix N means next cell character". 
+                // However, standard RLE often implies 'b' if omitted before !.
+                // Let's stick to strict parsing: if no char, ignore number or treat as error?
+                // Implementation choice: Treat pending count before '!' as dead cells 'b'.
+                let count = parseInt(countStr);
+                for (let k = 0; k < count; k++) {
+                    currentRow.push(0);
+                }
+                countStr = '';
+            }
+            parsedRows.push(currentRow);
+            currentRow = [];
+        } else {
+            // Ignore unknown characters or handle as error
+            // For robustness, we skip or treat as dead. 
+            // Let's skip to avoid breaking on noise.
+        }
+        i++;
+    }
+
+    // If row wasn't terminated by '!', push it if it has content
+    if (currentRow.length > 0) {
+        parsedRows.push(currentRow);
+    }
+
+    return parsedRows;
+}
+
+/**
+ * Grid Management
+ */
+function initGrid(rowsData) {
+    if (!rowsData || rowsData.length === 0) {
+        // Default empty 10x10
+        rowsData = Array(10).fill(null).map(() => Array(10).fill(0));
+    }
+
+    // Calculate dimensions
+    rows = rowsData.length;
+    cols = 0;
+    rowsData.forEach(r => {
+        if (r.length > cols) cols = r.length;
+    });
+
+    // Pad rows and build grid
+    grid = rowsData.map(row => {
+        // Pad with 0s (dead) to match max width
+        const padded = [...row];
+        while (padded.length < cols) {
+            padded.push(0);
+        }
+        return padded;
+    });
+
+    // Save for reset
+    initialGrid = JSON.parse(JSON.stringify(grid));
+
+    // Resize Canvas
+    canvas.width = cols * CELL_SIZE;
+    canvas.height = rows * CELL_SIZE;
+    
+    updateURL();
+    draw();
+}
+
+/**
+ * Game Logic
+ */
+function nextGeneration() {
+    const nextGrid = [];
+    
+    for (let y = 0; y < rows; y++) {
+        const nextRow = [];
+        for (let x = 0; x < cols; x++) {
+            let neighbors = 0;
+            // Check 8 neighbors
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    if (dx === 0 && dy === 0) continue;
+                    
+                    const ny = y + dy;
+                    const nx = x + dx;
+
+                    if (ny >= 0 && ny < rows && nx >= 0 && nx < cols) {
+                        neighbors += grid[ny][nx];
+                    }
+                }
+            }
+
+            const current = grid[y][x];
+            // Rules:
+            // 1. Live cell with < 2 neighbors dies
+            // 2. Live cell with 2 or 3 neighbors lives
+            // 3. Live cell with > 3 neighbors dies
+            // 4. Dead cell with exactly 3 neighbors becomes live
+            if (current === 1) {
+                nextRow.push((neighbors === 2 || neighbors === 3) ? 1 : 0);
+            } else {
+                nextRow.push((neighbors === 3) ? 1 : 0);
+            }
+        }
+        nextGrid.push(nextRow);
+    }
+    
+    grid = nextGrid;
+    updateURL();
+    draw();
+}
+
+/**
+ * Rendering
+ */
+function draw() {
+    // Clear background
+    ctx.fillStyle = COLOR_DEAD;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw Live Cells
+    ctx.fillStyle = COLOR_ALIVE;
+    for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+            if (grid[y][x] === 1) {
+                ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE - 1, CELL_SIZE - 1);
+            }
+        }
+    }
+}
+
+/**
+ * URL Handling
+ */
+function gridToRLE() {
+    let rle = "";
+    let count = 0;
+    let lastChar = '';
+
+    for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+            const cell = grid[y][x];
+            const char = cell === 1 ? 'o' : 'b';
+            
+            if (char === lastChar) {
+                count++;
+            } else {
+                if (count > 0) {
+                    if (count > 1) rle += count;
+                    rle += lastChar;
+                }
+                lastChar = char;
+                count = 1;
+            }
+        }
+        // End of row
+        if (count > 0) {
+            if (count > 1) rle += count;
+            rle += lastChar;
+        }
+        rle += "!";
+        count = 0;
+        lastChar = '';
+    }
+    return rle;
+}
+
+function updateURL() {
+    const rle = gridToRLE();
+    // Use replaceState to avoid feedback loop
+    history.replaceState(null, null, '#' + rle);
+}
+
+function loadFromURL() {
+    const hash = window.location.hash.substring(1); // Remove '#'
+    
+    if (!hash) {
+        // Default pattern: Glider
+        const defaultRLE = "3o!3o!3o!"; 
+        return defaultRLE;
+    }
+
+    try {
+        const rowsData = parseRLE(hash);
+        if (rowsData.length === 0) throw new Error("Empty grid");
+        initGrid(rowsData);
+        statusEl.textContent = "Loaded from URL.";
+        setTimeout(() => statusEl.textContent = "", 2000);
+    } catch (e) {
+        statusEl.textContent = "Error parsing RLE: " + e.message;
+        // Fallback to empty
+        initGrid([]);
+    }
+}
+
+/**
+ * Controls & Loop
+ */
+function togglePause() {
+    isRunning = !isRunning;
+    if (isRunning) {
+        lastTickTime = performance.now();
+        loop();
+    } else {
+        cancelAnimationFrame(animationId);
+    }
+}
+
+function step() {
+    if (isRunning) togglePause(); // Pause if running
+    nextGeneration();
+}
+
+function reset() {
+    if (isRunning) togglePause();
+    grid = JSON.parse(JSON.stringify(initialGrid));
+    updateURL();
+    draw();
+}
+
+function clear() {
+    if (isRunning) togglePause();
+    for(let y=0; y<rows; y++) {
+        for(let x=0; x<cols; x++) {
+            grid[y][x] = 0;
+        }
+    }
+    initialGrid = JSON.parse(JSON.stringify(grid));
+    updateURL();
+    draw();
+}
+
+function loop(timestamp) {
+    if (!isRunning) return;
+
+    if (timestamp - lastTickTime > 1000 / FPS) {
+        nextGeneration();
+        lastTickTime = timestamp;
+    }
+    animationId = requestAnimationFrame(loop);
+}
+
+/**
+ * Input Handling
+ */
+// Mouse
+canvas.addEventListener('mousedown', (e) => {
+    if (isRunning) togglePause(); // Pause on interaction
+    
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.floor((e.clientX - rect.left) / CELL_SIZE);
+    const y = Math.floor((e.clientY - rect.top) / CELL_SIZE);
+
+    if (x >= 0 && x < cols && y >= 0 && y < rows) {
+        grid[y][x] = grid[y][x] ? 0 : 1;
+        initialGrid = JSON.parse(JSON.stringify(grid)); // Update reset point
+        updateURL();
+        draw();
+    }
+});
+
+// Keyboard
+document.addEventListener('keydown', (e) => {
+    // Prevent default browser zooming for Space/+/-
+    if(["Space"].includes(e.code)) e.preventDefault();
+
+    switch(e.code) {
+        case 'Space':
+            togglePause();
+            break;
+        case 'KeyS':
+            step();
+            break;
+        case 'KeyR':
+            reset();
+            break;
+        case 'KeyC':
+            clear();
+            break;
+    }
+});
+
+// Button Bindings
+document.getElementById('btn-pause').addEventListener('click', togglePause);
+document.getElementById('btn-step').addEventListener('click', step);
+document.getElementById('btn-reset').addEventListener('click', reset);
+document.getElementById('btn-clear').addEventListener('click', clear);
+
+// Initialization
+window.addEventListener('hashchange', loadFromURL);
+loadFromURL(); // Initial Load
+
+</script>
+</body>
+</html>

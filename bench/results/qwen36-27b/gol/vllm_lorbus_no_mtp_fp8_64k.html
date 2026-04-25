@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conway's Game of Life (RLE)</title>
+    <style>
+        :root {
+            --bg-color: #222;
+            --text-color: #eee;
+            --accent-color: #00d0ff;
+            --grid-line: #333;
+            --cell-live: #00d0ff;
+            --cell-dead: #111;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        header {
+            width: 100%;
+            padding: 10px 20px;
+            background: #111;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            box-sizing: border-box;
+        }
+
+        h1 { margin: 0; font-size: 1.2rem; }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        button {
+            background: #444;
+            border: 1px solid #555;
+            color: white;
+            padding: 5px 15px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            transition: background 0.2s;
+        }
+
+        button:hover { background: #555; }
+        button:active { background: #666; }
+        button.active { background: var(--accent-color); color: #000; }
+
+        .status {
+            font-size: 0.8rem;
+            color: #aaa;
+            margin-left: 15px;
+            min-width: 150px;
+            text-align: right;
+        }
+
+        .error-msg {
+            color: #ff4444;
+            font-weight: bold;
+        }
+
+        #canvas-container {
+            flex: 1;
+            width: 100%;
+            overflow: auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            background-image: 
+                linear-gradient(var(--grid-line) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+            background-size: 20px 20px; /* Matches default cell size */
+        }
+
+        canvas {
+            background-color: var(--cell-dead);
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            cursor: crosshair;
+        }
+
+        .instructions {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Game of Life</h1>
+    <div class="controls">
+        <button id="btn-toggle">Start</button>
+        <button id="btn-step">Step</button>
+        <button id="btn-reset">Reset</button>
+        <button id="btn-clear">Clear</button>
+        <div id="status-display" class="status">Ready</div>
+    </div>
+</header>
+
+<div id="canvas-container">
+    <canvas id="gameCanvas"></canvas>
+    <div class="instructions">
+        Space: Play/Pause | S: Step | R: Reset | C: Clear | Click to toggle
+    </div>
+</div>
+
+<script>
+/**
+ * Configuration
+ */
+const CELL_SIZE = 20;
+const DEFAULT_RLE = "3o!3o!3o"; // Glider
+const TICK_RATE = 100; // ms
+
+/**
+ * State
+ */
+let grid = [];
+let initialGrid = [];
+let rows = 0;
+let cols = 0;
+let isRunning = false;
+let timer = null;
+let errorState = null;
+
+// DOM Elements
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const btnToggle = document.getElementById('btn-toggle');
+const btnStep = document.getElementById('btn-step');
+const btnReset = document.getElementById('btn-reset');
+const btnClear = document.getElementById('btn-clear');
+const statusDisplay = document.getElementById('status-display');
+
+/**
+ * RLE Parser
+ * Parses a string like "3o2b1o!2b3o"
+ */
+function parseRLE(rleString) {
+    if (!rleString || rleString.trim() === '') return null;
+    
+    const result = [];
+    let currentRow = [];
+    let count = 0;
+    let i = 0;
+    
+    // Normalize: remove whitespace
+    const str = rleString.replace(/\s/g, '');
+
+    try {
+        while (i < str.length) {
+            const char = str[i];
+            
+            if (char === '!') {
+                // End of row
+                if (currentRow.length > 0) {
+                    result.push(currentRow);
+                    currentRow = [];
+                } else {
+                    // Empty row
+                    result.push([]);
+                }
+                count = 0; // Reset count for next row
+                i++;
+            } else if (char === '#') {
+                // Comment, skip until !
+                while (i < str.length && str[i] !== '!') i++;
+                if (i < str.length) {
+                    // We hit the !, handle it in next loop iteration
+                    // But we need to push the empty row if we were in one, or just skip
+                    // Standard RLE comments usually don't break grid structure unless at end
+                    // Simple skip:
+                    i++; 
+                    // If we are here, we consumed the !. 
+                    // If we weren't in a row, we push an empty one to maintain structure?
+                    // Let's assume simple grid structure for this exercise.
+                    if(result.length === 0 || currentRow.length > 0) {
+                         // If we had content, push it. If not, maybe we just skipped a comment line.
+                         // To keep it simple: if we hit ! after #, it's a new line break.
+                         if(currentRow.length > 0) {
+                            result.push(currentRow);
+                            currentRow = [];
+                         } else if (result.length > 0) {
+                             // If we are between rows, push empty
+                             result.push([]);
+                         }
+                    }
+                    count = 0;
+                }
+            } else if (char >= '0' && char <= '9') {
+                // Digit
+                count = count * 10 + parseInt(char, 10);
+                i++;
+            } else if (char === 'o' || char === 'b') {
+                // Cell
+                const repeat = count === 0 ? 1 : count;
+                const state = char === 'o' ? 1 : 0;
+                for (let k = 0; k < repeat; k++) {
+                    currentRow.push(state);
+                }
+                count = 0;
+                i++;
+            } else {
+                // Unknown character
+                throw new Error(`Invalid RLE character: '${char}' at index ${i}`);
+            }
+        }
+
+        // Handle last row if it didn't end with '!'
+        if (currentRow.length > 0) {
+            result.push(currentRow);
+        } else if (result.length === 0) {
+             // Empty string that wasn't caught
+             return null;
+        }
+
+        return result;
+
+    } catch (e) {
+        throw e;
+    }
+}
+
+/**
+ * Grid Management
+ */
+function initGridFromRLE(rleString) {
+    try {
+        const parsed = parseRLE(rleString);
+        if (!parsed || parsed.length === 0) throw new Error("Empty grid");
+
+        // Determine dimensions
+        rows = parsed.length;
+        cols = 0;
+        parsed.forEach(row => {
+            if (row.length > cols) cols = row.length;
+        });
+
+        if (cols === 0) throw new Error("Empty grid");
+
+        // Normalize rows (pad with dead cells)
+        grid = parsed.map(row => {
+            const padded = new Array(cols).fill(0);
+            for (let i = 0; i < row.length; i++) {
+                padded[i] = row[i];
+            }
+            return padded;
+        });
+
+        // Deep copy for reset
+        initialGrid = JSON.parse(JSON.stringify(grid));
+        
+        // Resize canvas
+        canvas.width = cols * CELL_SIZE;
+        canvas.height = rows * CELL_SIZE;
+        
+        errorState = null;
+        updateStatus(`Grid: ${cols}x${rows}`);
+        draw();
+        
+    } catch (e) {
+        console.error(e);
+        errorState = e.message;
+        updateStatus(`Error: ${e.message}`, true);
+        // Keep old grid or clear? Let's keep old grid but show error
+        if (grid.length === 0) {
+            grid = [[0]]; cols=1; rows=1;
+            canvas.width = CELL_SIZE;
+            canvas.height = CELL_SIZE;
+        }
+        draw();
+    }
+}
+
+function resetGrid() {
+    grid = JSON.parse(JSON.stringify(initialGrid));
+    stop();
+    draw();
+    updateStatus("Reset");
+}
+
+function clearGrid() {
+    grid = grid.map(row => row.map(() => 0));
+    initialGrid = JSON.parse(JSON.stringify(grid)); // Reset point is now empty
+    stop();
+    draw();
+    updateStatus("Cleared");
+}
+
+/**
+ * Game Logic
+ */
+function step() {
+    if (errorState) return;
+
+    const nextGrid = new Array(rows).fill(0).map(() => new Array(cols).fill(0));
+
+    for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+            // Count neighbors
+            let neighbors = 0;
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    if (dx === 0 && dy === 0) continue;
+                    
+                    const ny = y + dy;
+                    const nx = x + dx;
+
+                    // Wrap around (Toroidal)
+                    if (ny >= 0 && ny < rows && nx >= 0 && nx < cols) {
+                        neighbors += grid[ny][nx];
+                    }
+                }
+            }
+
+            // Rules
+            const isAlive = grid[y][x] === 1;
+            if (isAlive) {
+                nextGrid[y][x] = (neighbors === 2 || neighbors === 3) ? 1 : 0;
+            } else {
+                nextGrid[y][x] = (neighbors === 3) ? 1 : 0;
+            }
+        }
+    }
+
+    grid = nextGrid;
+    draw();
+    updateURL();
+}
+
+/**
+ * Rendering
+ */
+function draw() {
+    // Clear
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw Live Cells
+    ctx.fillStyle = '#00d0ff';
+    for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+            if (grid[y][x] === 1) {
+                ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE - 1, CELL_SIZE - 1);
+            }
+        }
+    }
+}
+
+/**
+ * URL Handling
+ */
+function updateURL() {
+    // Convert grid back to RLE
+    let rleString = "";
+    for (let y = 0; y < rows; y++) {
+        let run = 0;
+        let currentType = null;
+        
+        for (let x = 0; x < cols; x++) {
+            const val = grid[y][x] === 1 ? 'o' : 'b';
+            
+            if (val !== currentType) {
+                // New type, flush previous
+                if (currentType !== null) {
+                    rleString += run + currentType;
+                }
+                currentType = val;
+                run = 1;
+            } else {
+                run++;
+            }
+        }
+        // Flush last run of row
+        if (currentType !== null) {
+            rleString += run + currentType;
+        }
+        rleString += '!';
+    }
+
+    // Update URL without reloading
+    history.replaceState(null, null, '#' + rleString);
+}
+
+/**
+ * Controls & Loop
+ */
+function togglePlay() {
+    if (isRunning) {
+        stop();
+    } else {
+        start();
+    }
+}
+
+function start() {
+    if (errorState) return;
+    isRunning = true;
+    btnToggle.textContent = "Pause";
+    btnToggle.classList.add('active');
+    updateStatus("Running...");
+    
+    if (timer) clearInterval(timer);
+    timer = setInterval(() => {
+        step();
+    }, TICK_RATE);
+}
+
+function stop() {
+    isRunning = false;
+    btnToggle.textContent = "Start";
+    btnToggle.classList.remove('active');
+    updateStatus("Paused");
+    if (timer) {
+        clearInterval(timer);
+        timer = null;
+    }
+}
+
+function updateStatus(msg, isError = false) {
+    statusDisplay.textContent = msg;
+    if (isError) statusDisplay.classList.add('error-msg');
+    else statusDisplay.classList.remove('error-msg');
+}
+
+/**
+ * Event Listeners
+ */
+
+// Buttons
+btnToggle.addEventListener('click', togglePlay);
+btnStep.addEventListener('click', () => {
+    stop(); // Step implies stopping
+    step();
+    updateStatus("Stepped");
+});
+btnReset.addEventListener('click', resetGrid);
+btnClear.addEventListener('click', clearGrid);
+
+// Keyboard
+document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT') return; // Ignore if typing in input
+    
+    switch(e.key.toLowerCase()) {
+        case ' ':
+            e.preventDefault();
+            togglePlay();
+            break;
+        case 's':
+            stop();
+            step();
+            updateStatus("Stepped");
+            break;
+        case 'r':
+            resetGrid();
+            break;
+        case 'c':
+            clearGrid();
+            break;
+    }
+});
+
+// Canvas Click (Toggle Cell)
+canvas.addEventListener('mousedown', (e) => {
+    if (isRunning) return; // Only toggle when paused
+
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.floor((e.clientX - rect.left) / CELL_SIZE);
+    const y = Math.floor((e.clientY - rect.top) / CELL_SIZE);
+
+    if (x >= 0 && x < cols && y >= 0 && y < rows) {
+        grid[y][x] = grid[y][x] === 1 ? 0 : 1;
+        draw();
+        updateURL();
+        // Update initial grid so reset goes back to this state? 
+        // Usually "Reset" goes back to the state at start of session.
+        // But for better UX, let's update initialGrid on clear, but not on edit?
+        // Let's stick to strict: Reset = Initial Load.
+    }
+});
+
+// Initialization
+function init() {
+    let hash = window.location.hash.substring(1); // Remove #
+    if (!hash) {
+        hash = DEFAULT_RLE;
+        history.replaceState(null, null, '#' + hash);
+    }
+    initGridFromRLE(hash);
+}
+
+init();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conway's Game of Life</title>
+    <style>
+        :root {
+            --bg-color: #1e1e1e;
+            --panel-color: #2d2d2d;
+            --text-color: #e0e0e0;
+            --accent-color: #4CAF50;
+            --accent-hover: #45a049;
+            --error-color: #ff5252;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        header {
+            background-color: var(--panel-color);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            z-index: 10;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            background-color: #444;
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        button:hover {
+            background-color: #555;
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        button.primary {
+            background-color: var(--accent-color);
+        }
+
+        button.primary:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .status-bar {
+            background-color: var(--panel-color);
+            padding: 5px 20px;
+            font-size: 0.8rem;
+            color: #aaa;
+            display: flex;
+            justify-content: space-between;
+            border-top: 1px solid #333;
+        }
+
+        .error-msg {
+            color: var(--error-color);
+            font-weight: bold;
+        }
+
+        #canvas-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background-color: #111;
+            cursor: crosshair;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        .shortcuts {
+            font-size: 0.75rem;
+            opacity: 0.7;
+        }
+        
+        kbd {
+            background-color: #444;
+            border-radius: 3px;
+            border: 1px solid #555;
+            padding: 1px 4px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div>
+        <h1>Game of Life (RLE)</h1>
+        <span class="shortcuts">
+            <kbd>Space</kbd> Play/Pause &nbsp;
+            <kbd>S</kbd> Step &nbsp;
+            <kbd>R</kbd> Reset &nbsp;
+            <kbd>C</kbd> Clear
+        </span>
+    </div>
+    <div class="controls">
+        <button id="btn-toggle" class="primary">Play</button>
+        <button id="btn-step">Step</button>
+        <button id="btn-reset">Reset</button>
+        <button id="btn-clear">Clear</button>
+    </div>
+</header>
+
+<div id="canvas-container">
+    <canvas id="gridCanvas"></canvas>
+</div>
+
+<div class="status-bar">
+    <span id="status-text">Generation: 0 | State: Paused</span>
+    <span id="coords-text">0, 0</span>
+</div>
+
+<script>
+/**
+ * Game of Life Implementation
+ * 
+ * Features:
+ * - RLE Parsing and Serialization
+ * - URL Hash Synchronization
+ * - Canvas Rendering
+ * - Keyboard/Mouse Controls
+ */
+
+// --- Configuration ---
+const CELL_SIZE = 10; // Pixels per cell
+const BG_COLOR = '#111111';
+const CELL_COLOR = '#4CAF50';
+const GRID_COLOR = '#222222';
+
+// --- State ---
+let grid = [];
+let rows = 0;
+let cols = 0;
+let generation = 0;
+let isRunning = false;
+let animationId = null;
+let lastRenderTime = 0;
+const FPS = 15; // Speed of simulation
+
+// --- DOM Elements ---
+const canvas = document.getElementById('gridCanvas');
+const ctx = canvas.getContext('2d', { alpha: false });
+const container = document.getElementById('canvas-container');
+const btnToggle = document.getElementById('btn-toggle');
+const btnStep = document.getElementById('btn-step');
+const btnReset = document.getElementById('btn-reset');
+const btnClear = document.getElementById('btn-clear');
+const statusText = document.getElementById('status-text');
+const coordsText = document.getElementById('coords-text');
+
+// --- Default Pattern (Glider) ---
+const DEFAULT_RLE = "2o!b2o!4o!";
+
+// --- RLE Parser ---
+/**
+ * Parses an RLE string into a 2D array (0 or 1).
+ * Handles 'o' (live), 'b' (dead), '!' (newline), digits (counts).
+ * Ignores comments (#) and whitespace.
+ */
+function parseRLE(rleString) {
+    if (!rleString) return [];
+    
+    const gridData = [];
+    let currentRow = [];
+    let count = 0;
+    let isCounting = false;
+
+    for (let i = 0; i < rleString.length; i++) {
+        const char = rleString[i];
+
+        // Skip comments and whitespace
+        if (char === '#' || char === ' ' || char === '\n' || char === '\r' || char === '\t') {
+            continue;
+        }
+
+        if (char === '!') {
+            // End of row
+            gridData.push(currentRow);
+            currentRow = [];
+            count = 0;
+            continue;
+        }
+
+        if (char >= '0' && char <= '9') {
+            count = count * 10 + parseInt(char, 10);
+            isCounting = true;
+            continue;
+        }
+
+        // If we hit a character but haven't started counting, default count is 1
+        if (!isCounting) {
+            count = 1;
+            isCounting = false;
+        }
+
+        if (char === 'o' || char === 'O') {
+            for (let k = 0; k < count; k++) currentRow.push(1);
+        } else if (char === 'b' || char === 'B') {
+            for (let k = 0; k < count; k++) currentRow.push(0);
+        } else if (char === '$') {
+            // Legacy support for $ as newline
+            gridData.push(currentRow);
+            currentRow = [];
+        }
+        
+        // Reset count after processing a character
+        count = 0;
+        isCounting = false;
+    }
+
+    // Push the last row if not empty or if the string didn't end with !
+    if (currentRow.length > 0) {
+        gridData.push(currentRow);
+    } else if (gridData.length === 0) {
+        // Handle case where input is just "!" or empty effectively
+        gridData.push([]);
+    }
+
+    return gridData;
+}
+
+// --- RLE Serializer ---
+/**
+ * Converts a 2D grid back to RLE string.
+ * Optimized to encode trailing dead cells at the end of rows and the grid.
+ */
+function generateRLE(gridState) {
+    let rle = "";
+    const totalRows = gridState.length;
+
+    for (let y = 0; y < totalRows; y++) {
+        const row = gridState[y];
+        const rowLen = row.length;
+        
+        // Find the last live cell in this row to know how much we need to encode
+        let lastLiveIndex = -1;
+        for (let x = rowLen - 1; x >= 0; x--) {
+            if (row[x] === 1) {
+                lastLiveIndex = x;
+                break;
+            }
+        }
+
+        // If no live cells, we don't need to encode anything for this row (it's all dead)
+        // But we need to know if it's the last row.
+        
+        let count = 0;
+        let currentChar = 'b';
+
+        // We only iterate up to lastLiveIndex + 1. 
+        // If lastLiveIndex is -1, loop doesn't run, which is correct (row is empty).
+        for (let x = 0; x <= lastLiveIndex; x++) {
+            const cell = row[x];
+            const char = cell === 1 ? 'o' : 'b';
+
+            if (char === currentChar) {
+                count++;
+            } else {
+                // Flush previous
+                if (count > 0) {
+                    if (count > 1) rle += count;
+                    rle += currentChar;
+                }
+                currentChar = char;
+                count = 1;
+            }
+        }
+        
+        // Flush remaining
+        if (count > 0) {
+            if (count > 1) rle += count;
+            rle += currentChar;
+        }
+
+        // Add row separator if not the last row
+        if (y < totalRows - 1) {
+            rle += "!";
+        }
+    }
+    return rle;
+}
+
+// --- Grid Management ---
+
+function initGrid(rleString) {
+    const parsed = parseRLE(rleString);
+    
+    if (parsed.length === 0) {
+        // Empty grid
+        grid = [];
+        rows = 0;
+        cols = 0;
+        return;
+    }
+
+    // Determine dimensions
+    rows = parsed.length;
+    cols = 0;
+    parsed.forEach(row => {
+        if (row.length > cols) cols = row.length;
+    });
+
+    // Normalize grid (pad rows, fix types)
+    grid = parsed.map(row => {
+        const newRow = new Array(cols).fill(0);
+        for(let i=0; i<row.length; i++) {
+            newRow[i] = row[i];
+        }
+        return newRow;
+    });
+
+    generation = 0;
+    resizeCanvas();
+    draw();
+    updateURL();
+    updateStatus();
+}
+
+function resizeCanvas() {
+    // Calculate optimal canvas size
+    canvas.width = cols * CELL_SIZE;
+    canvas.height = rows * CELL_SIZE;
+    
+    // Ensure canvas fits in viewport (simple scaling logic handled by CSS, 
+    // but we can adjust internal resolution if needed. For now, CSS handles display size).
+}
+
+// --- Simulation Logic ---
+
+function step() {
+    if (rows === 0 || cols === 0) return;
+
+    const nextGrid = new Array(rows).fill(0).map(() => new Array(cols).fill(0));
+
+    for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+            const neighbors = countNeighbors(x, y);
+            const isAlive = grid[y][x] === 1;
+
+            if (isAlive && (neighbors === 2 || neighbors === 3)) {
+                nextGrid[y][x] = 1;
+            } else if (!isAlive && neighbors === 3) {
+                nextGrid[y][x] = 1;
+            } else {
+                nextGrid[y][x] = 0;
+            }
+        }
+    }
+
+    grid = nextGrid;
+    generation++;
+    draw();
+    updateURL();
+    updateStatus();
+}
+
+function countNeighbors(x, y) {
+    let sum = 0;
+    for (let i = -1; i < 2; i++) {
+        for (let j = -1; j < 2; j++) {
+            if (i === 0 && j === 0) continue;
+            
+            // Toroidal wrapping (optional, but standard for small grids)
+            // For this implementation, let's stick to bounded (dead outside)
+            // or simple bounds checking.
+            const col = x + j;
+            const row = y + i;
+
+            if (col >= 0 && col < cols && row >= 0 && row < rows) {
+                sum += grid[row][col];
+            }
+        }
+    }
+    return sum;
+}
+
+// --- Rendering ---
+
+function draw() {
+    // Clear background
+    ctx.fillStyle = BG_COLOR;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw Cells
+    ctx.fillStyle = CELL_COLOR;
+    
+    // Optimization: Batch drawing operations
+    // We iterate and fillRect. For large grids, this is the bottleneck.
+    // A more optimized approach would use ImageData, but fillRect is usually fine for < 50k cells.
+    
+    for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+            if (grid[y][x] === 1) {
+                ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+            }
+        }
+    }
+
+    // Draw Grid Lines (Optional, only if cells are large enough or zoomed)
+    if (CELL_SIZE > 5) {
+        ctx.strokeStyle = GRID_COLOR;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let x = 0; x <= cols; x++) {
+            ctx.moveTo(x * CELL_SIZE, 0);
+            ctx.lineTo(x * CELL_SIZE, canvas.height);
+        }
+        for (let y = 0; y <= rows; y++) {
+            ctx.moveTo(0, y * CELL_SIZE);
+            ctx.lineTo(canvas.width, y * CELL_SIZE);
+        }
+        ctx.stroke();
+    }
+}
+
+// --- URL & State Management ---
+
+function updateURL() {
+    // Debounce slightly or just do it. For large grids, string gen might be slow.
+    // We only update if running or after significant interaction.
+    const rle = generateRLE(grid);
+    window.history.replaceState({ rle: rle }, '', '#' + rle);
+}
+
+function loadFromURL() {
+    const hash = window.location.hash.slice(1); // Remove #
+    if (!hash) {
+        initGrid(DEFAULT_RLE);
+    } else {
+        try {
+            // Basic validation before parsing
+            if (/[!$a-zA-Z0-9]/.test(hash)) {
+                initGrid(hash);
+            } else {
+                throw new Error("Invalid characters");
+            }
+        } catch (e) {
+            console.error("RLE Parse Error", e);
+            statusText.innerHTML = `<span class="error-msg">Error: Malformed RLE in URL. Loading default.</span>`;
+            initGrid(DEFAULT_RLE);
+        }
+    }
+}
+
+// --- Controls ---
+
+function togglePlay() {
+    isRunning = !isRunning;
+    btnToggle.textContent = isRunning ? "Pause" : "Play";
+    btnToggle.classList.toggle('primary', !isRunning); // Style change
+    updateStatus();
+    if (isRunning) {
+        lastRenderTime = performance.now();
+        loop();
+    } else {
+        cancelAnimationFrame(animationId);
+    }
+}
+
+function loop(timestamp) {
+    if (!isRunning) return;
+
+    const elapsed = timestamp - lastRenderTime;
+    const interval = 1000 / FPS;
+
+    if (elapsed > interval) {
+        step();
+        lastRenderTime = timestamp - (elapsed % interval);
+    }
+
+    animationId = requestAnimationFrame(loop);
+}
+
+function handleClear() {
+    grid = grid.map(row => row.fill(0));
+    generation = 0;
+    draw();
+    updateURL();
+    updateStatus();
+}
+
+function handleReset() {
+    // Reload from current hash
+    loadFromURL();
+    if (isRunning) {
+        isRunning = false;
+        togglePlay(); // Turn it back on
+    }
+}
+
+function updateStatus() {
+    const state = isRunning ? "Running" : "Paused";
+    statusText.textContent = `Generation: ${generation} | State: ${state} | Grid: ${cols}x${rows}`;
+}
+
+// --- Interaction ---
+
+canvas.addEventListener('mousedown', (e) => {
+    if (isRunning) return; // Only edit when paused
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
+    const x = Math.floor((e.clientX - rect.left) * scaleX / CELL_SIZE);
+    const y = Math.floor((e.clientY - rect.top) * scaleY / CELL_SIZE);
+
+    if (x >= 0 && x < cols && y >= 0 && y < rows) {
+        grid[y][x] = grid[y][x] ? 0 : 1;
+        draw();
+        updateURL();
+    }
+});
+
+canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
+    const x = Math.floor((e.clientX - rect.left) * scaleX / CELL_SIZE);
+    const y = Math.floor((e.clientY - rect.top) * scaleY / CELL_SIZE);
+
+    if (x >= 0 && x < cols && y >= 0 && y < rows) {
+        coordsText.textContent = `x: ${x}, y: ${y}`;
+    }
+});
+
+// Keyboard Shortcuts
+window.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT') return;
+
+    switch(e.code) {
+        case 'Space':
+            e.preventDefault();
+            togglePlay();
+            break;
+        case 'KeyS':
+            if (!isRunning) {
+                step();
+            }
+            break;
+        case 'KeyR':
+            handleReset();
+            break;
+        case 'KeyC':
+            handleClear();
+            break;
+    }
+});
+
+// Button Listeners
+btnToggle.addEventListener('click', togglePlay);
+btnStep.addEventListener('click', () => {
+    if (!isRunning) step();
+});
+btnReset.addEventListener('click', handleReset);
+btnClear.addEventListener('click', handleClear);
+
+// --- Initialization ---
+
+// Handle window resize to keep canvas sharp/fitting
+window.addEventListener('resize', () => {
+    // Optional: Add zoom logic here if desired. 
+    // Currently CSS handles the visual scaling of the fixed-size canvas.
+});
+
+// Start
+loadFromURL();
+
+</script>
+</body>
+</html>
