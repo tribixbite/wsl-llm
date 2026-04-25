@@ -1,0 +1,7 @@
+[Unit]
+Description=llama-server health watchdog
+After=llama-server.service
+
+[Service]
+Type=oneshot
+ExecStart={{REPO_DIR}}/services/llama-server-watchdog.sh

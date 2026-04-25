@@ -1,0 +1,16 @@
+[Unit]
+Description=llama-server (Qwen 3.6 inference, engine selected per ~/llama-server.conf)
+After=network.target
+
+[Service]
+Type=simple
+User={{USER}}
+KillMode=control-group
+Environment=PATH=/usr/local/cuda-12.6/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=LD_LIBRARY_PATH=/usr/local/cuda-12.6/lib64
+ExecStart={{REPO_DIR}}/services/llama-server.sh
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

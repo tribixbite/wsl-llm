@@ -1,0 +1,37 @@
+#!/bin/bash
+# llama-server watchdog — detects zombie child processes and stuck health endpoint
+# Runs every 30s via systemd timer.
+
+HEALTH_URL="http://localhost:8080/health"
+CONF="{{HOME}}/llama-server.conf"
+API_KEY=""
+SERVICE="llama-server"
+
+# Read API key from config
+if [ -f "$CONF" ]; then
+    API_KEY=$(grep '^API_KEY=' "$CONF" 2>/dev/null | cut -d= -f2-)
+fi
+
+if ! systemctl is-active --quiet "$SERVICE"; then
+    exit 0
+fi
+
+# Check 1: Multiple llama-server processes = zombie child from CUDA crash
+PROC_COUNT=$(pgrep -c -x llama-server 2>/dev/null || echo 0)
+if [ "$PROC_COUNT" -gt 1 ]; then
+    echo "$(date): WATCHDOG: Detected $PROC_COUNT llama-server processes. Killing all."
+    pkill -9 -x llama-server
+    exit 1
+fi
+
+# Check 2: Health endpoint must respond within 10s
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
+    -H "Authorization: Bearer $API_KEY" "$HEALTH_URL" 2>/dev/null)
+
+if [ "$HTTP_CODE" != "200" ]; then
+    echo "$(date): WATCHDOG: Health check failed (HTTP $HTTP_CODE). Killing."
+    pkill -9 -x llama-server
+    exit 1
+fi
+
+exit 0

@@ -1,0 +1,13 @@
+[Unit]
+Description=Cloudflare Tunnel
+After=network.target llama-server.service
+
+[Service]
+Type=simple
+User={{USER}}
+ExecStart=/usr/local/bin/cloudflared tunnel --config {{HOME}}/.cloudflared/config.yml run wsl-llm
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

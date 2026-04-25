@@ -1,0 +1,50 @@
+# llama-server configuration
+# Edit this file, then restart: llm restart
+#
+# Production config: Madreag's TurboQuant CUDA fork + Qwen 3.6 UD-Q4_K_XL
+# + turbo3 KV cache → full 262k context at ~100 t/s decode on a single 24 GB GPU.
+# See docs/QWEN36_BENCHMARKS.md for the benchmark report behind these defaults.
+
+# Engine binary (Madreag's llama-cpp-turboquant fork)
+# Built by scripts/build-turboquant.sh into ~/llama-cpp-turboquant/llama-server
+LLAMA_BIN={{HOME}}/llama-cpp-turboquant/llama-server
+
+# Model — Unsloth Dynamic 2.0 mixed-precision Q4 (~21 GB)
+# Download with:  hf download unsloth/Qwen3.6-35B-A3B-GGUF Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf --local-dir ~/models/
+MODEL={{HOME}}/models/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf
+ALIAS=qwen3.6-35b-a3b
+
+# Context & slots — full 262k now possible thanks to turbo3 KV (5× compression)
+# Set NUM_SLOTS=2 and CONTEXT_SIZE=131072 (32k each) for 2 concurrent requests at ~99 t/s
+CONTEXT_SIZE=262144
+NUM_SLOTS=1
+
+# GPU
+CUDA_VISIBLE_DEVICES=0
+GPU_LAYERS=999
+FLASH_ATTENTION=on
+
+# KV cache (TurboQuant) — turbo3 = 3.125 bpv, ~5× compression, near-q8_0 quality
+# Alternatives: turbo4 (4.25 bpv, best quality), turbo2 (2.125 bpv, max compression),
+# turbo3_tcq (Viterbi, slower encode but lower KLD)
+KV_TYPE_K=turbo3
+KV_TYPE_V=turbo3
+
+# Sampling defaults (non-thinking coding preset per Unsloth Qwen 3.6 docs)
+TEMP=0.6
+TOP_P=0.95
+TOP_K=20
+MIN_P=0.0
+
+# Thinking — disable by default; re-enable per request via chat_template_kwargs
+REASONING_BUDGET=0
+
+# Network
+HOST=0.0.0.0
+PORT=8080
+API_KEY={{LLAMA_API_KEY}}
+
+# Extra flags (space-separated)
+# --reasoning-format deepseek: proper reasoning block parsing for clients
+# --jinja: use the model's chat template via jinja
+EXTRA_FLAGS=--jinja --reasoning-format deepseek

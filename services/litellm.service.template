@@ -1,0 +1,22 @@
+[Unit]
+Description=LiteLLM Proxy Server
+After=network.target docker.service llama-server.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User={{USER}}
+Environment=PATH={{HOME}}/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=LITELLM_MASTER_KEY={{LITELLM_MASTER_KEY}}
+Environment=LITELLM_SALT_KEY={{LITELLM_SALT_KEY}}
+Environment=DATABASE_URL=postgresql://litellm:{{DB_PASSWORD}}@localhost:5434/litellm
+Environment=UI_USERNAME={{ADMIN_USER}}
+Environment=UI_PASSWORD={{ADMIN_PASSWORD}}
+ExecStartPre=/usr/bin/docker start litellm-pg
+ExecStartPre=/bin/sleep 5
+ExecStart={{HOME}}/.local/bin/litellm --config {{HOME}}/litellm_config.yaml --port 4000 --host 0.0.0.0
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
