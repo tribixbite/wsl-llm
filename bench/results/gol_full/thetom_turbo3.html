@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conway's Game of Life — RLE URL Hash</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #0a0a0f;
+  color: #c8c8d0;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+h1 {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #e0e0e8;
+  margin-bottom: 16px;
+  letter-spacing: 0.5px;
+}
+
+.controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+button {
+  background: #1e1e2e;
+  color: #c8c8d0;
+  border: 1px solid #333;
+  padding: 8px 18px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s;
+  user-select: none;
+}
+
+button:hover {
+  background: #2a2a3e;
+  border-color: #555;
+}
+
+button:active {
+  background: #3a3a4e;
+}
+
+button.active {
+  background: #1a3a2a;
+  border-color: #4a4;
+  color: #8f8;
+}
+
+.speed-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 12px;
+  font-size: 0.85rem;
+}
+
+input[type="range"] {
+  width: 100px;
+  accent-color: #667;
+}
+
+.info-bar {
+  display: flex;
+  gap: 24px;
+  font-size: 0.8rem;
+  color: #888;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.info-bar span {
+  white-space: nowrap;
+}
+
+.info-bar .val {
+  color: #aab;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.canvas-wrap {
+  border: 1px solid #2a2a3a;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #050508;
+  position: relative;
+  line-height: 0;
+}
+
+canvas {
+  display: block;
+  cursor: crosshair;
+}
+
+.error-msg {
+  color: #f66;
+  font-size: 0.85rem;
+  margin-bottom: 12px;
+  text-align: center;
+  min-height: 1.2em;
+}
+
+.shortcuts {
+  margin-top: 16px;
+  font-size: 0.75rem;
+  color: #555;
+  text-align: center;
+}
+
+.shortcuts kbd {
+  background: #1a1a2a;
+  border: 1px solid #333;
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: #888;
+}
+
+.rle-display {
+  font-size: 0.75rem;
+  color: #556;
+  margin-top: 8px;
+  max-width: 700px;
+  word-break: break-all;
+  text-align: center;
+  min-height: 1em;
+}
+</style>
+</head>
+<body>
+
+<h1>Conway's Game of Life</h1>
+
+<div class="controls">
+  <button id="btnStartPause" title="Space">▶ Start</button>
+  <button id="btnStep" title="S">⏭ Step</button>
+  <button id="btnReset" title="R">↺ Reset</button>
+  <button id="btnClear" title="C">✕ Clear</button>
+  <div class="speed-control">
+    <label for="speedRange">Speed:</label>
+    <input type="range" id="speedRange" min="1" max="60" value="10">
+    <span id="speedLabel">10 t/s</span>
+  </div>
+</div>
+
+<div class="error-msg" id="errorMsg"></div>
+
+<div class="info-bar">
+  <span>Generation: <span class="val" id="genLabel">0</span></span>
+  <span>Grid: <span class="val" id="sizeLabel">—</span></span>
+  <span>Population: <span class="val" id="popLabel">0</span></span>
+</div>
+
+<div class="canvas-wrap">
+  <canvas id="canvas"></canvas>
+</div>
+
+<div class="rle-display" id="rleDisplay">RLE: —</div>
+
+<div class="shortcuts">
+  <kbd>Space</kbd> Play/Pause &nbsp;
+  <kbd>S</kbd> Step &nbsp;
+  <kbd>R</kbd> Reset &nbsp;
+  <kbd>C</kbd> Clear &nbsp;
+  Click to toggle cells when paused
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ─── Constants ───
+  const CELL_SIZE = 12;
+  const GRID_COLOR = '#111118';
+  const CELL_ALIVE_COLOR = '#4fc3f7';
+  const CELL_DEAD_COLOR = '#0a0a12';
+  const BG_COLOR = '#050508';
+
+  // ─── DOM refs ───
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const btnStartPause = document.getElementById('btnStartPause');
+  const btnStep = document.getElementById('btnStep');
+  const btnReset = document.getElementById('btnReset');
+  const btnClear = document.getElementById('btnClear');
+  const speedRange = document.getElementById('speedRange');
+  const speedLabel = document.getElementById('speedLabel');
+  const genLabel = document.getElementById('genLabel');
+  const sizeLabel = document.getElementById('sizeLabel');
+  const popLabel = document.getElementById('popLabel');
+  const errorMsg = document.getElementById('errorMsg');
+  const rleDisplay = document.getElementById('rleDisplay');
+
+  // ─── State ───
+  let grid = [];
+  let rows = 0;
+  let cols = 0;
+  let generation = 0;
+  let running = false;
+  let animFrameId = null;
+  let lastTickTime = 0;
+  let speed = 10;
+  let initialRLE = '';
+  let originalHash = '';
+  let hashUpdatePending = false;
+  let hashDebounceTimer = null;
+  let errorState = false;
+
+  // ─── Default pattern (Glider) ───
+  const DEFAULT_RLE = 'O!2BO!3BO!';
+
+  // ═══════════════════════════════════════
+  //  RLE Parsing
+  // ═══════════════════════════════════════
+
+  function parseRLE(rleStr) {
+    if (!rleStr || typeof rleStr !== 'string') {
+      throw new Error('Empty RLE string');
+    }
+
+    const trimmed = rleStr.trim();
+    if (!trimmed) {
+      throw new Error('Empty RLE string');
+    }
+
+    const rowsList = [];
+    let currentRow = [];
+    let i = 0;
+    let len = trimmed.length;
+
+    while (i < len) {
+      const ch = trimmed[i];
+
+      if (ch === '!') {
+        // End of row
+        if (currentRow.length > 0 || rowsList.length === 0) {
+          rowsList.push(currentRow);
+        }
+        currentRow = [];
+        i++;
+      } else if (ch === 'o' || ch === 'b') {
+        // Cell type with implicit count of 1
+        currentRow.push(ch === 'o' ? 1 : 0);
+        i++;
+      } else if (ch >= '0' && ch <= '9') {
+        // Digit: parse the number
+        let numStr = '';
+        while (i < len && trimmed[i] >= '0' && trimmed[i] <= '9') {
+          numStr += trimmed[i];
+          i++;
+        }
+        const count = parseInt(numStr, 10);
+        if (isNaN(count) || count < 1) {
+          throw new Error('Invalid count: ' + numStr);
+        }
+
+        if (i >= len) {
+          throw new Error('RLE ends with digit but no cell type');
+        }
+
+        const cellType = trimmed[i];
+        if (cellType !== 'o' && cellType !== 'b') {
+          throw new Error('Expected \'o\' or \'b\' after number, got \'' + cellType + '\'');
+        }
+        i++;
+
+        const val = cellType === 'o' ? 1 : 0;
+        for (let j = 0; j < count; j++) {
+          currentRow.push(val);
+        }
+      } else {
+        throw new Error('Unexpected character: \'' + ch + '\'');
+      }
+    }
+
+    // If the string didn't end with '!', add the last row
+    if (currentRow.length > 0) {
+      rowsList.push(currentRow);
+    } else if (trimmed.endsWith('!') && rowsList.length === 0) {
+      // Trailing ! with no content before it — add empty row? No, ignore trailing !
+      // Actually, let's just drop trailing empty rows
+      while (rowsList.length > 0 && rowsList[rowsList.length - 1].length === 0) {
+        rowsList.pop();
+      }
+    }
+
+    if (rowsList.length === 0) {
+      throw new Error('RLE produced no rows');
+    }
+
+    // Trim trailing all-zero rows (dead rows at the bottom)
+    while (rowsList.length > 1) {
+      const last = rowsList[rowsList.length - 1];
+      if (last.every(v => v === 0)) {
+        rowsList.pop();
+      } else {
+        break;
+      }
+    }
+
+    // Trim trailing all-zero columns
+    if (rowsList.length > 0) {
+      let maxCol = 0;
+      for (let r = 0; r < rowsList.length; r++) {
+        for (let c = rowsList[r].length - 1; c >= 0; c--) {
+          if (rowsList[r][c] === 1) {
+            maxCol = Math.max(maxCol, c + 1);
+          }
+        }
+      }
+      if (maxCol < rowsList[0].length) {
+        for (let r = 0; r < rowsList.length; r++) {
+          rowsList[r] = rowsList[r].slice(0, maxCol);
+        }
+      }
+    }
+
+    // Check that all rows have the same length
+    const rowLen = rowsList[0].length;
+    for (let r = 0; r < rowsList.length; r++) {
+      if (rowsList[r].length !== rowLen) {
+        // Pad shorter rows with zeros
+        while (rowsList[r].length < rowLen) {
+          rowsList[r].push(0);
+        }
+        // Or trim longer rows
+        if (rowsList[r].length > rowLen) {
+          rowsList[r] = rowsList[r].slice(0, rowLen);
+        }
+      }
+    }
+
+    return rowsList;
+  }
+
+  function encodeRLE(gridData, numRows, numCols) {
+    let rle = '';
+    for (let r = 0; r < numRows; r++) {
+      let runStart = 0;
+      let runVal = gridData[r][0];
+      let runLen = 1;
+
+      for (let c = 1; c < numCols; c++) {
+        if (gridData[r][c] === runVal && runLen < 999999) {
+          runLen++;
+        } else {
+          if (runLen > 1) {
+            rle += runLen;
+          }
+          rle += runVal === 1 ? 'o' : 'b';
+          runVal = gridData[r][c];
+          runLen = 1;
+        }
+      }
+      // Emit last run
+      if (runLen > 1) {
+        rle += runLen;
+      }
+      rle += runVal === 1 ? 'o' : 'b';
+
+      // Add '!' for row separator, but not after the last row
+      if (r < numRows - 1) {
+        rle += '!';
+      }
+    }
+    return rle;
+  }
+
+  // ═══════════════════════════════════════
+  //  Grid Operations
+  // ═══════════════════════════════════════
+
+  function deepCopyGrid(src, numRows, numCols) {
+    const dst = [];
+    for (let r = 0; r < numRows; r++) {
+      dst.push(Array.prototype.slice.call(src[r]));
+    }
+    return dst;
+  }
+
+  function stepGrid(src, numRows, numCols) {
+    const dst = [];
+    for (let r = 0; r < numRows; r++) {
+      dst.push(new Array(numCols));
+    }
+    for (let r = 0; r < numRows; r++) {
+      for (let c = 0; c < numCols; c++) {
+        let neighbors = 0;
+        for (let dr = -1; dr <= 1; dr++) {
+          for (let dc = -1; dc <= 1; dc++) {
+            if (dr === 0 && dc === 0) continue;
+            const nr = r + dr;
+            const nc = c + dc;
+            if (nr >= 0 && nr < numRows && nc >= 0 && nc < numCols) {
+              neighbors += src[nr][nc];
+            }
+          }
+        }
+        if (src[r][c] === 1) {
+          dst[r][c] = (neighbors === 2 || neighbors === 3) ? 1 : 0;
+        } else {
+          dst[r][c] = (neighbors === 3) ? 1 : 0;
+        }
+      }
+    }
+    return dst;
+  }
+
+  function countPopulation(gridData, numRows, numCols) {
+    let count = 0;
+    for (let r = 0; r < numRows; r++) {
+      for (let c = 0; c < numCols; c++) {
+        count += gridData[r][c];
+      }
+    }
+    return count;
+  }
+
+  // ═══════════════════════════════════════
+  //  Rendering
+  // ═══════════════════════════════════════
+
+  function render() {
+    canvas.width = cols * CELL_SIZE;
+    canvas.height = rows * CELL_SIZE;
+
+    ctx.fillStyle = BG_COLOR;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const x = c * CELL_SIZE;
+        const y = r * CELL_SIZE;
+        if (grid[r][c] === 1) {
+          ctx.fillStyle = CELL_ALIVE_COLOR;
+          ctx.fillRect(x + 1, y + 1, CELL_SIZE - 2, CELL_SIZE - 2);
+        } else {
+          ctx.fillStyle = CELL_DEAD_COLOR;
+          ctx.fillRect(x, y, CELL_SIZE, CELL_SIZE);
+        }
+      }
+    }
+
+    // Grid lines (subtle)
+    ctx.strokeStyle = GRID_COLOR;
+    ctx.lineWidth = 0.5;
+    for (let r = 0; r <= rows; r++) {
+      ctx.beginPath();
+      ctx.moveTo(0, r * CELL_SIZE);
+      ctx.lineTo(cols * CELL_SIZE, r * CELL_SIZE);
+      ctx.stroke();
+    }
+    for (let c = 0; c <= cols; c++) {
+      ctx.beginPath();
+      ctx.moveTo(c * CELL_SIZE, 0);
+      ctx.lineTo(c * CELL_SIZE, rows * CELL_SIZE);
+      ctx.stroke();
+    }
+
+    // Update info
+    genLabel.textContent = generation;
+    sizeLabel.textContent = cols + '×' + rows;
+    popLabel.textContent = countPopulation(grid, rows, cols);
+  }
+
+  function updateInfo() {
+    genLabel.textContent = generation;
+    sizeLabel.textContent = cols + '×' + rows;
+    popLabel.textContent = countPopulation(grid, rows, cols);
+  }
+
+  // ═══════════════════════════════════════
+  //  URL / Hash Management
+  // ═══════════════════════════════════════
+
+  function updateHashSafely(rleStr) {
+    if (hashDebounceTimer) {
+      clearTimeout(hashDebounceTimer);
+      hashDebounceTimer = null;
+    }
+    const encoded = encodeURIComponent(rleStr);
+    try {
+      history.replaceState(null, '', '#' + encoded);
+    } catch (e) {
+      // Fallback for some edge cases
+      window.location.hash = encoded;
+    }
+  }
+
+  function scheduleHashUpdate(rleStr) {
+    if (hashDebounceTimer) {
+      clearTimeout(hashDebounceTimer);
+    }
+    hashDebounceTimer = setTimeout(function() {
+      updateHashSafely(rleStr);
+      hashDebounceTimer = null;
+    }, 50);
+  }
+
+  function getRLEFromHash() {
+    const hash = window.location.hash;
+    if (hash && hash.length > 1) {
+      try {
+        return decodeURIComponent(hash.substring(1));
+      } catch (e) {
+        try {
+          // Try manual decode for non-ASCII chars
+          return decodeURIComponent(escape(hash.substring(1)));
+        } catch (e2) {
+          return null;
+        }
+      }
+    }
+    return null;
+  }
+
+  // ═══════════════════════════════════════
+  //  Game Loop
+  // ═══════════════════════════════════════
+
+  function gameLoop(timestamp) {
+    animFrameId = requestAnimationFrame(gameLoop);
+
+    if (!running) return;
+
+    const interval = 1000 / speed;
+    if (timestamp - lastTickTime < interval) return;
+
+    lastTickTime = timestamp;
+
+    // Step
+    grid = stepGrid(grid, rows, cols);
+    generation++;
+
+    // Encode and update hash
+    const rle = encodeRLE(grid, rows, cols);
+    scheduleHashUpdate(rle);
+    rleDisplay.textContent = 'RLE: ' + rle;
+
+    render();
+    updateInfo();
+  }
+
+  function startGame() {
+    if (running) return;
+    running = true;
+    lastTickTime = performance.now();
+    btnStartPause.textContent = '⏸ Pause';
+    btnStartPause.classList.add('active');
+    canvas.style.cursor = 'default';
+    animFrameId = requestAnimationFrame(gameLoop);
+  }
+
+  function pauseGame() {
+    running = false;
+    btnStartPause.textContent = '▶ Start';
+    btnStartPause.classList.remove('active');
+    canvas.style.cursor = 'crosshair';
+    if (animFrameId) {
+      cancelAnimationFrame(animFrameId);
+      animFrameId = null;
+    }
+  }
+
+  function stepGame() {
+    const wasRunning = running;
+    if (running) {
+      pauseGame();
+    }
+
+    grid = stepGrid(grid, rows, cols);
+    generation++;
+
+    const rle = encodeRLE(grid, rows, cols);
+    updateHashSafely(rle);
+    rleDisplay.textContent = 'RLE: ' + rle;
+    render();
+    updateInfo();
+
+    if (wasRunning) {
+      startGame();
+    }
+  }
+
+  function resetToInitial() {
+    pauseGame();
+    generation = 0;
+    errorState = false;
+    errorMsg.textContent = '';
+
+    const rleStr = initialRLE || DEFAULT_RLE;
+    loadRLE(rleStr);
+  }
+
+  function clearGame() {
+    pauseGame();
+    generation = 0;
+    errorState = false;
+    errorMsg.textContent = '';
+
+    grid = [];
+    rows = 0;
+    cols = 0;
+
+    // Create a minimal 1x1 dead grid
+    grid = [[0]];
+    rows = 1;
+    cols = 1;
+
+    updateHashSafely('b');
+    rleDisplay.textContent = 'RLE: b';
+    render();
+    updateInfo();
+  }
+
+  // ═══════════════════════════════════════
+  //  Loading
+  // ═══════════════════════════════════════
+
+  function loadRLE(rleStr) {
+    try {
+      const parsed = parseRLE(rleStr);
+      rows = parsed.length;
+      cols = parsed[0].length;
+      grid = deepCopyGrid(parsed, rows, cols);
+      generation = 0;
+      errorState = false;
+      errorMsg.textContent = '';
+      render();
+      updateInfo();
+      rleDisplay.textContent = 'RLE: ' + rleStr;
+      return true;
+    } catch (e) {
+      errorState = true;
+      errorMsg.textContent = 'RLE Error: ' + e.message;
+      // Show a blank grid
+      grid = [[0]];
+      rows = 1;
+      cols = 1;
+      render();
+      updateInfo();
+      return false;
+    }
+  }
+
+  function initFromURL() {
+    const rleStr = getRLEFromHash();
+    if (rleStr) {
+      initialRLE = rleStr;
+      loadRLE(rleStr);
+    } else {
+      initialRLE = DEFAULT_RLE;
+      loadRLE(DEFAULT_RLE);
+    }
+  }
+
+  // ═══════════════════════════════════════
+  //  Event Handlers
+  // ═══════════════════════════════════════
+
+  btnStartPause.addEventListener('click', function() {
+    if (running) {
+      pauseGame();
+    } else {
+      startGame();
+    }
+  });
+
+  btnStep.addEventListener('click', function() {
+    stepGame();
+  });
+
+  btnReset.addEventListener('click', function() {
+    resetToInitial();
+  });
+
+  btnClear.addEventListener('click', function() {
+    clearGame();
+  });
+
+  speedRange.addEventListener('input', function() {
+    speed = parseInt(this.value, 10);
+    speedLabel.textContent = speed + ' t/s';
+  });
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', function(e) {
+    // Don't capture if user is in an input
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+    switch (e.code) {
+      case 'Space':
+        e.preventDefault();
+        if (running) {
+          pauseGame();
+        } else {
+          startGame();
+        }
+        break;
+      case 'KeyS':
+        e.preventDefault();
+        stepGame();
+        break;
+      case 'KeyR':
+        e.preventDefault();
+        resetToInitial();
+        break;
+      case 'KeyC':
+        e.preventDefault();
+        clearGame();
+        break;
+    }
+  });
+
+  // Click to toggle cells (only when paused)
+  canvas.addEventListener('click', function(e) {
+    if (running) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+
+    const col = Math.floor(x / CELL_SIZE);
+    const row = Math.floor(y / CELL_SIZE);
+
+    if (row >= 0 && row < rows && col >= 0 && col < cols) {
+      grid[row][col] = grid[row][col] === 1 ? 0 : 1;
+      generation = 0; // Reset generation on manual edit
+
+      const rle = encodeRLE(grid, rows, cols);
+      updateHashSafely(rle);
+      rleDisplay.textContent = 'RLE: ' + rle;
+      render();
+      updateInfo();
+    }
+  });
+
+  // Prevent hash-change feedback loop by using replaceState in our updates
+  // The only time we read the hash is on page load
+  window.addEventListener('hashchange', function() {
+    // We intentionally ignore hash changes during operation.
+    // Users can only load a new state by pasting a new URL and refreshing.
+    // This prevents feedback loops from our own hash updates.
+  });
+
+  // ═══════════════════════════════════════
+  //  Init
+  // ═══════════════════════════════════════
+
+  initFromURL();
+
+  // Start the animation loop (it will idle until running is true)
+  animFrameId = requestAnimationFrame(gameLoop);
+
+})();
+</script>
+
+</body>
+</html>

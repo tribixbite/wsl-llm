@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conway's Game of Life – RLE</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0a0a0f;
+  --surface: #13131f;
+  --border: #2a2a3a;
+  --text: #d0d0e0;
+  --text-dim: #707088;
+  --accent: #4fc3f7;
+  --accent-dim: #2a7a9a;
+  --danger: #ef5350;
+  --success: #66bb6a;
+  --warn: #ffa726;
+  --cell-bg: #1a1a2e;
+  --cell-on: #4fc3f7;
+  --cell-off: #0d0d18;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'SF Mono', 'Cascadia Code', 'Consolas', 'Menlo', monospace;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  user-select: none;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+header h1 {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  color: var(--accent);
+}
+
+.url-bar {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0 10px;
+  height: 34px;
+  min-width: 0;
+}
+
+.url-bar span {
+  color: var(--text-dim);
+  font-size: 12px;
+  white-space: nowrap;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+.url-bar code {
+  font-size: 12px;
+  color: var(--text);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+  display: block;
+}
+
+.controls {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.btn {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0 14px;
+  height: 34px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.btn:hover { border-color: var(--accent-dim); background: #1a1a2e; }
+.btn:active { transform: scale(0.97); }
+.btn.primary { background: var(--accent-dim); border-color: var(--accent); color: #fff; }
+.btn.primary:hover { background: var(--accent); }
+.btn.danger { border-color: #5a2a2a; color: var(--danger); }
+.btn.danger:hover { background: #2a1515; border-color: var(--danger); }
+
+kbd {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+main {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+}
+
+canvas {
+  display: block;
+  flex: 1;
+  cursor: crosshair;
+}
+
+footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 16px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+footer .status-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  display: inline-block;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+footer .status-dot.running { background: var(--success); box-shadow: 0 0 6px var(--success); }
+footer .status-text { display: flex; align-items: center; }
+
+#toast {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  background: var(--danger);
+  color: #fff;
+  padding: 8px 20px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s, transform 0.3s;
+  z-index: 100;
+}
+
+#toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+@media (max-width: 700px) {
+  header { flex-wrap: wrap; gap: 8px; }
+  .url-bar { order: 10; width: 100%; }
+  .url-bar span { display: none; }
+  .btn span.btn-label { display: none; }
+  kbd { display: none; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⬡ Game of Life</h1>
+  <div class="url-bar">
+    <span>#</span>
+    <code id="hash-display"></code>
+  </div>
+  <div class="controls">
+    <button class="btn primary" id="btn-play" title="Space">
+      <span id="play-icon">▶</span>
+      <span class="btn-label" id="play-label">Play</span>
+      <kbd>Space</kbd>
+    </button>
+    <button class="btn" id="btn-step" title="Step forward">
+      ⏭ <span class="btn-label">Step</span>
+      <kbd>S</kbd>
+    </button>
+    <button class="btn" id="btn-reset" title="Reset to initial state">
+      ↺ <span class="btn-label">Reset</span>
+      <kbd>R</kbd>
+    </button>
+    <button class="btn danger" id="btn-clear" title="Clear grid">
+      ✕ <span class="btn-label">Clear</span>
+      <kbd>C</kbd>
+    </button>
+  </div>
+</header>
+
+<main>
+  <canvas id="grid"></canvas>
+</main>
+
+<footer>
+  <div class="status-text">
+    <span class="status-dot" id="status-dot"></span>
+    <span id="status-label">Stopped</span>
+  </div>
+  <span id="info">Generation: 0 · <span id="cell-count">0</span> cells</span>
+</footer>
+
+<div id="toast"></div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ── DOM refs ──
+  const canvas = document.getElementById('grid');
+  const ctx = canvas.getContext('2d');
+  const hashDisplay = document.getElementById('hash-display');
+  const btnPlay = document.getElementById('btn-play');
+  const btnStep = document.getElementById('btn-step');
+  const btnReset = document.getElementById('btn-reset');
+  const btnClear = document.getElementById('btn-clear');
+  const playIcon = document.getElementById('play-icon');
+  const playLabel = document.getElementById('play-label');
+  const statusDot = document.getElementById('status-dot');
+  const statusLabel = document.getElementById('status-label');
+  const infoEl = document.getElementById('info');
+  const cellCountEl = document.getElementById('cell-count');
+  const toastEl = document.getElementById('toast');
+
+  // ── State ──
+  let grid = [];
+  let rows = 0, cols = 0;
+  let generation = 0;
+  let running = false;
+  let initialGrid = null;
+  let initialRLE = '';
+  let animId = null;
+  let lastTick = 0;
+  const TICK_INTERVAL = 120; // ms per tick
+  const CELL_SIZE = 10;
+
+  // ── RLE Encoding ──
+  function encodeRLE(g, r, c) {
+    let rle = '';
+    for (let row = 0; row < r; row++) {
+      let liveRun = false;
+      let deadRun = false;
+      let liveCount = 0;
+      let deadCount = 0;
+
+      for (let col = 0; col < c; col++) {
+        const cell = g[row][col];
+        if (cell) {
+          if (deadRun) {
+            rle += deadCount + 'b';
+            deadRun = false;
+            deadCount = 0;
+          }
+          if (!liveRun) { liveRun = true; liveCount = 0; }
+          liveCount++;
+        } else {
+          if (liveRun) {
+            rle += (liveCount > 1 ? liveCount : '') + 'o';
+            liveRun = false;
+            liveCount = 0;
+          }
+          if (!deadRun) { deadRun = true; deadCount = 0; }
+          deadCount++;
+        }
+      }
+      if (liveRun) rle += (liveCount > 1 ? liveCount : '') + 'o';
+      if (deadRun && deadCount > 0) rle += (deadCount > 1 ? deadCount : '') + 'b';
+      if (row < r - 1) rle += '!';
+    }
+    return rle;
+  }
+
+  // ── RLE Decoding ──
+  function decodeRLE(rle) {
+    if (!rle || rle.trim() === '') return null;
+
+    const rows_arr = rle.split('!');
+    const result = [];
+
+    for (let i = 0; i < rows_arr.length; i++) {
+      const rowStr = rows_arr[i].trim();
+      if (rowStr === '') {
+        result.push([]);
+        continue;
+      }
+      const row = [];
+      let currentChar = null;
+      let currentCount = 0;
+
+      for (let j = 0; j < rowStr.length; j++) {
+        const ch = rowStr[j];
+        if (ch === 'o' || ch === 'b') {
+          const count = currentCount > 0 ? currentCount : 1;
+          const val = ch === 'o' ? 1 : 0;
+          for (let k = 0; k < count; k++) row.push(val);
+          currentChar = ch;
+          currentCount = 0;
+        } else if (ch >= '0' && ch <= '9') {
+          currentCount = currentCount * 10 + parseInt(ch, 10);
+        } else {
+          throw new Error('Unexpected character: ' + ch);
+        }
+      }
+
+      if (currentCount > 0) {
+        const val = currentChar === 'o' ? 1 : 0;
+        for (let k = 0; k < currentCount; k++) row.push(val);
+      }
+
+      if (row.length === 0) {
+        result.push([]);
+      } else {
+        result.push(row);
+      }
+    }
+
+    // Ensure at least one row
+    if (result.length === 0) result.push([]);
+
+    const numRows = result.length;
+    const numCols = Math.max(...result.map(r => r.length), 1);
+
+    // Normalize: pad rows to numCols, create new grid
+    const grid = [];
+    for (let i = 0; i < numRows; i++) {
+      const row = result[i];
+      const normalized = new Array(numCols).fill(0);
+      for (let j = 0; j < Math.min(row.length, numCols); j++) {
+        normalized[j] = row[j];
+      }
+      grid.push(normalized);
+    }
+
+    return { grid, rows: numRows, cols: numCols };
+  }
+
+  // ── Grid operations ──
+  function createGrid(r, c) {
+    const g = [];
+    for (let i = 0; i < r; i++) {
+      g.push(new Array(c).fill(0));
+    }
+    return g;
+  }
+
+  function deepCopy(g, r, c) {
+    const copy = [];
+    for (let i = 0; i < r; i++) {
+      copy.push(g[i].slice());
+    }
+    return copy;
+  }
+
+  function step(g, r, c) {
+    const next = createGrid(r, c);
+    for (let row = 0; row < r; row++) {
+      for (let col = 0; col < c; col++) {
+        let neighbors = 0;
+        for (let dr = -1; dr <= 1; dr++) {
+          for (let dc = -1; dc <= 1; dc++) {
+            if (dr === 0 && dc === 0) continue;
+            const nr = (row + dr + r) % r;
+            const nc = (col + dc + c) % c;
+            neighbors += g[nr][nc];
+          }
+        }
+        const cell = g[row][col];
+        if (cell) {
+          next[row][col] = (neighbors === 2 || neighbors === 3) ? 1 : 0;
+        } else {
+          next[row][col] = (neighbors === 3) ? 1 : 0;
+        }
+      }
+    }
+    return next;
+  }
+
+  // ── Rendering ──
+  function resizeCanvas() {
+    const mainEl = document.querySelector('main');
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = mainEl.clientWidth * dpr;
+    canvas.height = mainEl.clientHeight * dpr;
+    canvas.style.width = mainEl.clientWidth + 'px';
+    canvas.style.height = mainEl.clientHeight + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
+
+  function draw() {
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+
+    // Calculate cell size to fit
+    const cellW = Math.floor(w / cols);
+    const cellH = Math.floor(h / rows);
+    const cs = Math.max(1, Math.min(cellW, cellH));
+
+    const offsetX = Math.floor((w - cols * cs) / 2);
+    const offsetY = Math.floor((h - rows * cs) / 2);
+
+    ctx.fillStyle = '#08080f';
+    ctx.fillRect(0, 0, w, h);
+
+    // Draw cells
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const x = offsetX + col * cs;
+        const y = offsetY + row * cs;
+        if (grid[row][col]) {
+          ctx.fillStyle = '#4fc3f7';
+          ctx.fillRect(x, y, cs - 1, cs - 1);
+        } else {
+          ctx.fillStyle = '#0d0d18';
+          ctx.fillRect(x, y, cs - 1, cs - 1);
+        }
+      }
+    }
+
+    // Draw grid lines if cells are small enough
+    if (cs <= 14) {
+      ctx.strokeStyle = '#151525';
+      ctx.lineWidth = 0.5;
+      for (let row = 0; row <= rows; row++) {
+        const y = offsetY + row * cs;
+        ctx.beginPath();
+        ctx.moveTo(offsetX, y);
+        ctx.lineTo(offsetX + cols * cs, y);
+        ctx.stroke();
+      }
+      for (let col = 0; col <= cols; col++) {
+        const x = offsetX + col * cs;
+        ctx.beginPath();
+        ctx.moveTo(x, offsetY);
+        ctx.lineTo(x, offsetY + rows * cs);
+        ctx.stroke();
+      }
+    }
+  }
+
+  // ── UI Updates ──
+  function updateHashDisplay() {
+    const rle = encodeRLE(grid, rows, cols);
+    const hash = '#' + rle;
+    hashDisplay.textContent = rle || '(empty)';
+    // Update URL without triggering hashchange event
+    history.replaceState(null, '', hash);
+  }
+
+  function updateStatus() {
+    if (running) {
+      statusDot.className = 'status-dot running';
+      statusLabel.textContent = 'Running';
+      playIcon.textContent = '⏸';
+      playLabel.textContent = 'Pause';
+    } else {
+      statusDot.className = 'status-dot';
+      statusLabel.textContent = 'Stopped';
+      playIcon.textContent = '▶';
+      playLabel.textContent = 'Play';
+    }
+  }
+
+  function updateInfo() {
+    let count = 0;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        count += grid[r][c];
+      }
+    }
+    cellCountEl.textContent = count;
+    infoEl.textContent = 'Generation: ' + generation + ' · ' + count + ' cells';
+  }
+
+  // ── Toast ──
+  let toastTimeout = null;
+  function showToast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimeout);
+    toastTimeout = setTimeout(() => {
+      toastEl.classList.remove('show');
+    }, 2500);
+  }
+
+  // ── Load from URL ──
+  function loadFromHash() {
+    const hash = window.location.hash;
+    if (hash && hash.length > 1) {
+      try {
+        const rle = hash.substring(1);
+        const parsed = decodeRLE(rle);
+        if (!parsed) {
+          throw new Error('Empty RLE');
+        }
+        grid = parsed.grid;
+        rows = parsed.rows;
+        cols = parsed.cols;
+        initialGrid = deepCopy(grid, rows, cols);
+        initialRLE = rle;
+        generation = 0;
+        showToast('Loaded RLE from URL');
+      } catch (e) {
+        showToast('Malformed RLE in URL: ' + e.message);
+        loadDefault();
+      }
+    } else {
+      loadDefault();
+    }
+  }
+
+  function loadDefault() {
+    // Glider as default pattern
+    const defaultRLE = 'o2b!2o2b!3o!';
+    const parsed = decodeRLE(defaultRLE);
+    grid = parsed.grid;
+    rows = parsed.rows;
+    cols = parsed.cols;
+    initialGrid = deepCopy(grid, rows, cols);
+    initialRLE = defaultRLE;
+    generation = 0;
+  }
+
+  // ── Simulation Loop ──
+  function tick() {
+    if (!running) return;
+    const now = performance.now();
+    if (now - lastTick < TICK_INTERVAL) {
+      animId = requestAnimationFrame(tick);
+      return;
+    }
+    lastTick = now;
+    grid = step(grid, rows, cols);
+    generation++;
+    updateHashDisplay();
+    updateInfo();
+    draw();
+    animId = requestAnimationFrame(tick);
+  }
+
+  function start() {
+    if (running) return;
+    running = true;
+    updateStatus();
+    lastTick = performance.now();
+    animId = requestAnimationFrame(tick);
+  }
+
+  function stop() {
+    running = false;
+    if (animId) {
+      cancelAnimationFrame(animId);
+      animId = null;
+    }
+    updateStatus();
+  }
+
+  function stepOnce() {
+    stop();
+    grid = step(grid, rows, cols);
+    generation++;
+    updateHashDisplay();
+    updateInfo();
+    draw();
+  }
+
+  function reset() {
+    stop();
+    if (initialGrid) {
+      grid = deepCopy(initialGrid, rows, cols);
+      generation = 0;
+      updateHashDisplay();
+      updateInfo();
+      draw();
+      showToast('Reset to initial state');
+    }
+  }
+
+  function clear() {
+    stop();
+    grid = createGrid(rows, cols);
+    generation = 0;
+    initialGrid = deepCopy(grid, rows, cols);
+    initialRLE = '';
+    updateHashDisplay();
+    updateInfo();
+    draw();
+    showToast('Grid cleared');
+  }
+
+  // ── URL sync (prevent feedback loop) ──
+  let isExternalHashChange = false;
+  window.addEventListener('hashchange', function(e) {
+    if (isExternalHashChange) {
+      isExternalHashChange = false;
+      return;
+    }
+    // Only react if URL changed externally (not by our replaceState)
+    loadFromHash();
+    updateStatus();
+    updateInfo();
+    draw();
+  });
+
+  // Override history.replaceState to mark external changes
+  const origReplaceState = history.replaceState;
+  history.replaceState = function(state) {
+    isExternalHashChange = true;
+    origReplaceState.apply(history, arguments);
+  };
+
+  // ── Mouse interaction ──
+  let mouseDown = false;
+  let mouseButton = 0;
+  let lastToggledCell = null;
+
+  function getCellFromMouse(e) {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    const w = rect.width;
+    const h = rect.height;
+    const cellW = Math.floor(w / cols);
+    const cellH = Math.floor(h / rows);
+    const cs = Math.max(1, Math.min(cellW, cellH));
+    const offsetX = Math.floor((w - cols * cs) / 2);
+    const offsetY = Math.floor((h - rows * cs) / 2);
+
+    const col = Math.floor((mx - offsetX) / cs);
+    const row = Math.floor((my - offsetY) / cs);
+
+    if (row >= 0 && row < rows && col >= 0 && col < cols) {
+      return { row, col };
+    }
+    return null;
+  }
+
+  canvas.addEventListener('mousedown', function(e) {
+    if (running) return;
+    e.preventDefault();
+    mouseDown = true;
+    mouseButton = e.button;
+    const cell = getCellFromMouse(e);
+    if (cell) {
+      // Toggle: click on live → dead, dead → live
+      grid[cell.row][cell.col] = grid[cell.row][cell.col] ? 0 : 1;
+      lastToggledCell = cell;
+      updateHashDisplay();
+      updateInfo();
+      draw();
+    }
+  });
+
+  canvas.addEventListener('mousemove', function(e) {
+    if (!mouseDown || running) return;
+    e.preventDefault();
+    const cell = getCellFromMouse(e);
+    if (cell && lastToggledCell) {
+      // Brush: paint in the direction of the last toggle
+      if (cell.row !== lastToggledCell.row || cell.col !== lastToggledCell.col) {
+        const targetState = grid[lastToggledCell.row][lastToggledCell.col];
+        if (grid[cell.row][cell.col] !== targetState) {
+          grid[cell.row][cell.col] = targetState;
+          lastToggledCell = cell;
+          updateHashDisplay();
+          updateInfo();
+          draw();
+        }
+      }
+    }
+  });
+
+  canvas.addEventListener('mouseup', function() {
+    mouseDown = false;
+    lastToggledCell = null;
+  });
+
+  canvas.addEventListener('mouseleave', function() {
+    mouseDown = false;
+    lastToggledCell = null;
+  });
+
+  // Prevent context menu on canvas
+  canvas.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+
+  // ── Button handlers ──
+  btnPlay.addEventListener('click', function() {
+    if (running) stop();
+    else start();
+  });
+
+  btnStep.addEventListener('click', stepOnce);
+  btnReset.addEventListener('click', reset);
+  btnClear.addEventListener('click', clear);
+
+  // ── Keyboard shortcuts ──
+  document.addEventListener('keydown', function(e) {
+    // Don't capture if user is in an input
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+    switch(e.key.toLowerCase()) {
+      case ' ':
+        e.preventDefault();
+        if (running) stop();
+        else start();
+        break;
+      case 's':
+        e.preventDefault();
+        stepOnce();
+        break;
+      case 'r':
+        e.preventDefault();
+        reset();
+        break;
+      case 'c':
+        e.preventDefault();
+        clear();
+        break;
+    }
+  });
+
+  // ── Resize handling ──
+  window.addEventListener('resize', resizeCanvas);
+
+  // ── Init ──
+  loadFromHash();
+  updateStatus();
+  updateInfo();
+  resizeCanvas();
+
+})();
+</script>
+</body>
+</html>

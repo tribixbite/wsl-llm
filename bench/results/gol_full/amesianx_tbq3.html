@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conway's Game of Life — RLE</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0d1117;color:#c9d1d9;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px 16px 40px}
+  h1{font-size:1.5rem;font-weight:600;color:#58a6ff;margin-bottom:12px;letter-spacing:-.02em}
+  .status-bar{margin-bottom:10px;padding:8px 16px;background:#161b22;border-radius:8px;border:1px solid #30363d;font-size:.82rem;color:#8b949e;display:flex;align-items:center;gap:16px;flex-wrap:wrap;min-height:36px}
+  .status-bar .label{color:#8b949e}
+  .status-bar .val{color:#c9d1d9;font-weight:600;font-variant-numeric:tabular-nums}
+  .status-bar .err{color:#f85149;font-weight:600}
+  .status-bar .ok{color:#3fb950}
+  #canvas-wrap{position:relative;border:2px solid #30363d;border-radius:6px;overflow:hidden;background:#010409;box-shadow:0 0 30px rgba(88,166,255,.06)}
+  canvas{display:block;cursor:crosshair}
+  .controls{margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+  button{padding:8px 18px;border:1px solid #30363d;border-radius:6px;background:#21262d;color:#c9d1d9;font-size:.85rem;cursor:pointer;transition:all .15s;font-family:inherit}
+  button:hover{background:#30363d;border-color:#58a6ff;color:#fff}
+  button:active{background:#1f6feb;border-color:#58a6ff}
+  button.active{background:#1f6feb;border-color:#58a6ff;color:#fff}
+  .shortcuts{margin-top:14px;font-size:.75rem;color:#484f58;text-align:center;line-height:1.7}
+  .shortcuts kbd{background:#161b22;border:1px solid #30363d;border-radius:3px;padding:1px 6px;font-family:inherit;font-size:.72rem;color:#8b949e}
+</style>
+</head>
+<body>
+<h1>Conway's Game of Life</h1>
+<div class="status-bar" id="status-bar">
+  <span class="label">Grid:</span><span class="val" id="s-dim">—</span>
+  <span class="label">Gen:</span><span class="val" id="s-gen">0</span>
+  <span class="label">Pop:</span><span class="val" id="s-pop">0</span>
+  <span class="label">Status:</span><span class="val" id="s-st">Paused</span>
+</div>
+<div id="canvas-wrap"><canvas id="c"></canvas></div>
+<div class="controls">
+  <button id="btn-toggle">▶ Start</button>
+  <button id="btn-step">⏭ Step</button>
+  <button id="btn-reset">↺ Reset</button>
+  <button id="btn-clear">✕ Clear</button>
+</div>
+<div class="shortcuts">
+  <kbd>Space</kbd> Play/Pause &nbsp; <kbd>S</kbd> Step &nbsp; <kbd>R</kbd> Reset &nbsp; <kbd>C</kbd> Clear &nbsp; Click canvas to toggle cells
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ───────────────── constants ───────────────── */
+const CELL = 14;
+const BG   = "#010409";
+const DEAD = "#0d1117";
+const LIVE = "#58a6ff";
+const GRID = "#161b22";
+
+/* ───────────────── DOM refs ───────────────── */
+const canvas  = document.getElementById("c");
+const ctx     = canvas.getContext("2d");
+const bar     = document.getElementById("status-bar");
+const sDim    = document.getElementById("s-dim");
+const sGen    = document.getElementById("s-gen");
+const sPop    = document.getElementById("s-pop");
+const sSt     = document.getElementById("s-st");
+const btnToggle = document.getElementById("btn-toggle");
+const btnStep   = document.getElementById("btn-step");
+const btnReset  = document.getElementById("btn-reset");
+const btnClear  = document.getElementById("btn-clear");
+
+/* ───────────────── state ───────────────── */
+let grid      = null;   // 2D array [row][col]  0/1
+let gridW     = 0;
+let gridH     = 0;
+let generation = 0;
+let running   = false;
+let initHash  = "";      // original hash at load
+let initGrid  = null;    // decoded initial grid (for reset)
+let animId    = null;
+let lastTick  = 0;
+const TICK_MS = 150;
+
+/* ───────────────── helpers ───────────────── */
+function copyGrid(g){ return g.map(r => Array.from(r)); }
+
+function cellCount(g){
+  let n = 0;
+  for(let r=0;r<g.length;r++) for(let c=0;c<g[r].length;c++) n += g[r][c];
+  return n;
+}
+
+/* ──────────────── RLE decode ──────────────── */
+function parseRLE(raw){
+  const s = raw.trim();
+  if(!s) return null;
+  const rows = s.split("!");
+  const parsed = [];
+  for(let i=0;i<rows.length;i++){
+    const line = rows[i].trim();
+    if(line==="") continue;
+    const cells = [];
+    let j=0;
+    while(j<line.length){
+      if(line[j]==="o"){ cells.push(1); j++; }
+      else if(line[j]==="b"){ cells.push(0); j++; }
+      else if(line[j]>="1"&&line[j]<="9"){
+        const len = parseInt(line[j],10);
+        const ch  = line[++j];
+        if(ch==="o"){ for(let k=0;k<len;k++) cells.push(1); }
+        else if(ch==="b"){ for(let k=0;k<len;k++) cells.push(0); }
+        else throw new Error("Malformed RLE: '"+ch+"' after digit '"+line[j-1]+"' — expected 'o' or 'b'");
+        j++;
+      }
+      else throw new Error("Malformed RLE: unexpected character '"+line[j]+"' at position "+j);
+    }
+    if(cells.length>0) parsed.push(cells);
+  }
+  if(parsed.length===0) return null;
+  let maxW=0;
+  for(const r of parsed) if(r.length>maxW) maxW=r.length;
+  for(const r of parsed) while(r.length<maxW) r.push(0);
+  return {grid: parsed, w:maxW, h:parsed.length};
+}
+
+/* ──────────────── RLE encode ──────────────── */
+function encodeRLE(g){
+  let out="";
+  for(let r=0;r<g.length;r++){
+    const row=g[r];
+    let i=0;
+    while(i<row.length){
+      const val=row[i];
+      let run=1;
+      while(i+run<row.length && row[i+run]===val) run++;
+      if(run===1) out += val? "o" : "b";
+      else        out += run + (val?"o":"b");
+      i+=run;
+    }
+    out+="!";
+  }
+  return out;
+}
+
+/* ──────────────── Game of Life ──────────────── */
+function step(g){
+  const h=g.length, w=g[0].length;
+  const n=g.map(r=>new Uint8Array(w));
+  for(let r=0;r<h;r++) for(let c=0;c<w;c++){
+    let nb=0;
+    for(let dr=-1;dr<=1;dr++) for(let dc=-1;dc<=1;dc++){
+      if(!dr&&!dc) continue;
+      if(g[(r+dr+h)%h][(c+dc+w)%w]) nb++;
+    }
+    n[r][c] = g[r][c] ? (nb===2||nb===3?1:0) : (nb===3?1:0);
+  }
+  return n;
+}
+
+/* ───────────────── URL ───────────────── */
+function setURL(g){
+  try{
+    const h = "#"+encodeURIComponent(encodeRLE(g));
+    history.replaceState(null,"",h);
+  }catch(e){}
+}
+
+function getGridFromHash(){
+  const h = location.hash.slice(1);
+  if(!h) return null;
+  try{ return parseRLE(decodeURIComponent(h)); }
+  catch(e){ return null; }
+}
+
+/* ───────────────── RENDER ───────────────── */
+function render(){
+  if(!grid) return;
+  const w=gridW, h=gridH;
+  canvas.width  = w*CELL;
+  canvas.height = h*CELL;
+  ctx.fillStyle = BG;
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = DEAD;
+  for(let r=0;r<h;r++) for(let c=0;c<w;c++)
+    if(!grid[r][c]) ctx.fillRect(c*CELL+1,r*CELL+1,CELL-2,CELL-2);
+  ctx.fillStyle = LIVE;
+  for(let r=0;r<h;r++) for(let c=0;c<w;c++)
+    if(grid[r][c]) ctx.fillRect(c*CELL+1,r*CELL+1,CELL-2,CELL-2);
+  // grid lines (subtle)
+  ctx.strokeStyle = GRID;
+  ctx.lineWidth = .5;
+  ctx.beginPath();
+  for(let x=0;x<=w;x++){ ctx.moveTo(x*CELL+.25,0); ctx.lineTo(x*CELL+.25,h*CELL); }
+  for(let y=0;y<=h;y++){ ctx.moveTo(0,y*CELL+.25); ctx.lineTo(w*CELL,y*CELL+.25); }
+  ctx.stroke();
+}
+
+function updateStatus(){
+  sDim.textContent = gridW+"×"+gridH;
+  sGen.textContent = generation;
+  sPop.textContent = cellCount(grid);
+  sSt.textContent  = running ? "Running" : "Paused";
+  sSt.className    = running ? "val ok" : "val";
+}
+
+/* ───────────────── animation loop ───────────────── */
+function loop(ts){
+  animId = null;
+  if(!running) return;
+  if(ts - lastTick >= TICK_MS){
+    lastTick = ts;
+    grid = step(grid);
+    generation++;
+    setURL(grid);
+    render();
+    updateStatus();
+  }
+  animId = requestAnimationFrame(loop);
+}
+
+function startLoop(){
+  if(animId) return;
+  lastTick = performance.now();
+  animId = requestAnimationFrame(loop);
+}
+function stopLoop(){
+  if(animId){ cancelAnimationFrame(animId); animId=null; }
+}
+
+/* ───────────────── init ───────────────── */
+function initGridFromData(gw,gh){
+  grid = [];
+  for(let r=0;r<gh;r++){
+    const row = new Array(gw);
+    for(let c=0;c<gw;c++) row[c]=0;
+    grid.push(row);
+  }
+  gridW=gw; gridH=gh;
+}
+
+function setGrid(gw,gh,g){
+  gridW=gw; gridH=gh;
+  grid=g;
+  generation=0;
+  stopLoop(); running=false;
+  btnToggle.textContent="▶ Start";
+  btnToggle.classList.remove("active");
+  setURL(grid);
+  render(); updateStatus();
+}
+
+function loadFromHash(){
+  const data = getGridFromHash();
+  if(data){
+    initGrid = copyGrid(data.grid);
+    setGrid(data.w, data.h, data.grid);
+  } else {
+    // default pattern: Gosper Glider Gun
+    const g = [
+      [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,1,0,0,0,1,1,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    ];
+    initGrid = copyGrid(g);
+    setGrid(32,8,g);
+  }
+  initHash = location.hash;
+}
+
+/* ───────────────── errors ───────────────── */
+function showError(msg){
+  bar.innerHTML = '<span class="err">⚠ ' + msg + '</span>';
+  bar.style.borderColor = "#f85149";
+}
+function clearError(){
+  bar.innerHTML = '';
+  bar.style.borderColor = "";
+}
+
+/* ───────────────── event wiring ───────────────── */
+btnToggle.addEventListener("click", ()=>{
+  if(!grid) return;
+  running = !running;
+  btnToggle.textContent = running ? "⏸ Pause" : "▶ Start";
+  btnToggle.classList.toggle("active", running);
+  updateStatus();
+  if(running) startLoop(); else stopLoop();
+});
+
+btnStep.addEventListener("click", ()=>{
+  if(!grid||running) return;
+  grid = step(grid);
+  generation++;
+  setURL(grid);
+  render(); updateStatus();
+});
+
+btnReset.addEventListener("click", ()=>{
+  if(!initGrid) return;
+  setGrid(initGrid[0].length, initGrid.length, copyGrid(initGrid));
+  clearError();
+});
+
+btnClear.addEventListener("click", ()=>{
+  if(!grid) return;
+  const gw=gridW, gh=gridH;
+  initGrid = null;
+  initGrid = [];
+  for(let r=0;r<gh;r++){const r2=[];for(let c=0;c<gw;c++)r2.push(0);initGrid.push(r2);}
+  setGrid(gw,gh,initGrid);
+  clearError();
+});
+
+// Keyboard
+document.addEventListener("keydown", e=>{
+  if(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA") return;
+  switch(e.key){
+    case " ": e.preventDefault(); btnToggle.click(); break;
+    case "s": case "S": e.preventDefault(); btnStep.click(); break;
+    case "r": case "R": e.preventDefault(); btnReset.click(); break;
+    case "c": case "C": e.preventDefault(); btnClear.click(); break;
+  }
+});
+
+// Canvas click — toggle cell when paused
+canvas.addEventListener("click", e=>{
+  if(running) return;
+  if(!grid) return;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const mx = (e.clientX - rect.left)*scaleX;
+  const my = (e.clientY - rect.top)*scaleY;
+  const col = Math.floor(mx/CELL);
+  const row = Math.floor(my/CELL);
+  if(row<0||row>=gridH||col<0||col>=gridW) return;
+  grid[row][col] = grid[row][col] ? 0 : 1;
+  setURL(grid);
+  render(); updateStatus();
+});
+
+// Hash change — load new pattern
+window.addEventListener("hashchange", ()=>{
+  if(location.hash===initHash) return; // same as current, skip
+  const data = getGridFromHash();
+  if(data){
+    initGrid = copyGrid(data.grid);
+    setGrid(data.w, data.h, data.grid);
+    clearError();
+  } else {
+    showError("Invalid RLE in URL hash");
+  }
+});
+
+/* ───────────────── boot ───────────────── */
+loadFromHash();
+render();
+updateStatus();
+
+})();
+</script>
+</body>
+</html>

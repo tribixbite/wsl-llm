@@ -1,0 +1,8 @@
+ik_llama_k_xl_64k_q8               5449 tokens    52.589s   103.61 t/s  finish=stop
+ik_llama_imatrix_q4_0              5464 tokens    47.348s   115.40 t/s  finish=stop
+madreag_turbo3_262k                5988 tokens    58.925s   101.62 t/s  finish=stop
+thetom_turbo3                      6082 tokens    62.618s    97.12 t/s  finish=stop
+spiritbuun_turbo3                  5468 tokens    56.570s    96.65 t/s  finish=stop
+spiritbuun_turbo3_tcq             14735 tokens   187.672s    78.51 t/s  finish=stop
+amesianx_tbq3                      4350 tokens    45.097s    96.45 t/s  finish=stop
+animehacker_tq3_0                  6183 tokens   363.059s    17.03 t/s  finish=stop

@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conway's Game of Life — RLE URL Sharing</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0d1117;
+    color: #c9d1d9;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  h1 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: #58a6ff;
+    margin: 16px 0 4px;
+    letter-spacing: -0.02em;
+  }
+
+  .subtitle {
+    font-size: 0.75rem;
+    color: #8b949e;
+    margin-bottom: 12px;
+  }
+
+  #status-bar {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    font-size: 0.8rem;
+    color: #8b949e;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .status-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #3fb950;
+  }
+
+  .status-dot.paused { background: #f0883e; }
+  .status-dot.error { background: #f85149; }
+
+  #canvas-container {
+    position: relative;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #161b22;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+  }
+
+  canvas {
+    display: block;
+    cursor: crosshair;
+  }
+
+  #controls {
+    display: flex;
+    gap: 8px;
+    margin: 14px 0 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  button {
+    background: #21262d;
+    color: #c9d1d9;
+    border: 1px solid #30363d;
+    padding: 8px 18px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  button:hover { background: #30363d; border-color: #8b949e; }
+  button:active { transform: scale(0.97); }
+
+  button.primary {
+    background: #238636;
+    border-color: #2ea043;
+    color: #fff;
+  }
+
+  button.primary:hover { background: #2ea043; }
+
+  button.danger {
+    color: #f85149;
+  }
+
+  button.danger:hover { background: rgba(248,81,73,0.1); border-color: #f85149; }
+
+  #url-display {
+    width: 90%;
+    max-width: 700px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 8px 0 16px;
+  }
+
+  #url-display label {
+    font-size: 0.75rem;
+    color: #8b949e;
+    white-space: nowrap;
+  }
+
+  #url-input {
+    flex: 1;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    color: #58a6ff;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+    outline: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  #url-input:focus { border-color: #58a6ff; }
+
+  #error-display {
+    color: #f85149;
+    font-size: 0.78rem;
+    margin: 4px 0 8px;
+    min-height: 1.2em;
+    text-align: center;
+  }
+
+  #help {
+    font-size: 0.7rem;
+    color: #484f58;
+    margin-bottom: 20px;
+    text-align: center;
+    line-height: 1.6;
+  }
+
+  #help kbd {
+    background: #21262d;
+    border: 1px solid #30363d;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: inherit;
+    font-size: 0.68rem;
+  }
+
+  .speed-control {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    color: #8b949e;
+  }
+
+  input[type="range"] {
+    width: 80px;
+    accent-color: #58a6ff;
+  }
+</style>
+</head>
+<body>
+
+<h1>Conway's Game of Life</h1>
+<div class="subtitle">RLE-encoded state in the URL — share any frame by copying the link</div>
+
+<div id="status-bar">
+  <div class="status-item">
+    <div class="status-dot" id="status-dot"></div>
+    <span id="status-text">Paused</span>
+  </div>
+  <div class="status-item">Generation: <strong id="gen-count">0</strong></div>
+  <div class="status-item">Population: <strong id="pop-count">0</strong></div>
+  <div class="status-item">Grid: <strong id="grid-size">-</strong></div>
+  <div class="speed-control">
+    <span>Speed:</span>
+    <input type="range" id="speed-slider" min="1" max="60" value="10">
+    <span id="speed-val">10 fps</span>
+  </div>
+</div>
+
+<div id="error-display"></div>
+
+<div id="canvas-container">
+  <canvas id="canvas"></canvas>
+</div>
+
+<div id="controls">
+  <button class="primary" id="btn-play" title="Space">▶ Play</button>
+  <button id="btn-step" title="S">⏭ Step</button>
+  <button id="btn-reset" title="R">↺ Reset</button>
+  <button class="danger" id="btn-clear" title="C">✕ Clear</button>
+</div>
+
+<div id="url-display">
+  <label for="url-input">URL hash:</label>
+  <input type="text" id="url-input" readonly>
+</div>
+
+<div id="help">
+  <kbd>Space</kbd> Play/Pause &nbsp; <kbd>S</kbd> Step &nbsp; <kbd>R</kbd> Reset &nbsp; <kbd>C</kbd> Clear &nbsp; Click canvas when paused to toggle cells
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ─── Constants ──────────────────────────────────────────────
+  const CELL_SIZE = 12;
+  const GAP = 1;
+  const CELL_STROKE = '#21262d';
+  const CELL_ALIVE_COLOR = '#58a6ff';
+  const CELL_DEAD_BG = '#0d1117';
+
+  // ─── Default patterns ───────────────────────────────────────
+  const DEFAULT_RLE = '3o$2bo$bo!'; // Gosper Glider Gun simplified: block
+
+  // ─── DOM refs ───────────────────────────────────────────────
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const btnPlay = document.getElementById('btn-play');
+  const btnStep = document.getElementById('btn-step');
+  const btnReset = document.getElementById('btn-reset');
+  const btnClear = document.getElementById('btn-clear');
+  const urlInput = document.getElementById('url-input');
+  const statusDot = document.getElementById('status-dot');
+  const statusText = document.getElementById('status-text');
+  const genCount = document.getElementById('gen-count');
+  const popCount = document.getElementById('pop-count');
+  const gridSize = document.getElementById('grid-size');
+  const errorDisplay = document.getElementById('error-display');
+  const speedSlider = document.getElementById('speed-slider');
+  const speedVal = document.getElementById('speed-val');
+
+  // ─── State ──────────────────────────────────────────────────
+  let grid = null;
+  let rows = 0;
+  let cols = 0;
+  let generation = 0;
+  let running = false;
+  let initialRLE = '';
+  let frameId = null;
+  let lastTickTime = 0;
+  let fps = 10;
+
+  // ─── RLE Parser ─────────────────────────────────────────────
+  function parseRLE(rleStr) {
+    rleStr = (rleStr || '').trim();
+    if (!rleStr) return null;
+
+    const result = [];
+    let i = 0;
+    const len = rleStr.length;
+
+    while (i < len) {
+      const ch = rleStr[i];
+
+      if (ch === '!') {
+        // End of row
+        result.push([]);
+        i++;
+        continue;
+      }
+
+      if (ch === 'o' || ch === 'b') {
+        // Parse run length (default 1)
+        let runLen = 0;
+        while (i < len && rleStr[i] >= '0' && rleStr[i] <= '9') {
+          runLen = runLen * 10 + parseInt(rleStr[i], 10);
+          i++;
+        }
+        if (runLen === 0) runLen = 1;
+
+        const cellType = ch;
+        const row = result.length;
+        while (row < result.length) {
+          // ensure row exists (shouldn't happen normally)
+        }
+
+        // Expand into the current row
+        if (i < len && rleStr[i] === '!') {
+          // Last run ends at end of row
+          const rowArr = [];
+          for (let j = 0; j < runLen; j++) {
+            rowArr.push(cellType === 'o');
+          }
+          result.push(rowArr);
+          i++;
+        } else {
+          // Add to current row
+          if (result.length === 0) result.push([]);
+          for (let j = 0; j < runLen; j++) {
+            result[result.length - 1].push(cellType === 'o');
+          }
+        }
+        continue;
+      }
+
+      if (ch === '$') {
+        // Multiple empty rows
+        let runLen = 0;
+        while (i < len && rleStr[i] >= '0' && rleStr[i] <= '9') {
+          runLen = runLen * 10 + parseInt(rleStr[i], 10);
+          i++;
+        }
+        if (runLen === 0) runLen = 1;
+        for (let j = 0; j < runLen; j++) {
+          result.push([]);
+        }
+        continue;
+      }
+
+      // Skip unknown characters
+      i++;
+    }
+
+    // Remove trailing empty rows (no cells in them)
+    while (result.length > 0 && result[result.length - 1].length === 0) {
+      result.pop();
+    }
+
+    if (result.length === 0) return null;
+
+    // Normalize: ensure each row has the same width (pad with dead cells)
+    const maxCols = Math.max(...result.map(r => r.length));
+    if (maxCols === 0) return null;
+    for (let r = 0; r < result.length; r++) {
+      while (result[r].length < maxCols) {
+        result[r].push(false);
+      }
+    }
+
+    return { grid: result, rows: result.length, cols: maxCols };
+  }
+
+  // ─── RLE Encoder ────────────────────────────────────────────
+  function encodeRLE(g, r, c) {
+    let rle = '';
+    for (let row = 0; row < r; row++) {
+      let col = 0;
+      while (col < c) {
+        // Find run of same type
+        const type = g[row][col];
+        let runLen = 1;
+        while (col + runLen < c && g[row][col + runLen] === type) {
+          runLen++;
+        }
+        // Encode with digit if run > 1
+        const prefix = runLen > 1 ? runLen.toString() : '';
+        const ch = type ? 'o' : 'b';
+        rle += prefix + ch;
+        col += runLen;
+      }
+      rle += '!';
+    }
+    return rle;
+  }
+
+  // ─── Grid Operations ────────────────────────────────────────
+  function createGrid(r, c) {
+    const g = [];
+    for (let i = 0; i < r; i++) {
+      g.push(new Array(c).fill(false));
+    }
+    return g;
+  }
+
+  function countPopulation(g, r, c) {
+    let count = 0;
+    for (let i = 0; i < r; i++) {
+      for (let j = 0; j < c; j++) {
+        if (g[i][j]) count++;
+      }
+    }
+    return count;
+  }
+
+  function stepGrid(g, r, c) {
+    const next = createGrid(r, c);
+    for (let i = 0; i < r; i++) {
+      for (let j = 0; j < c; j++) {
+        let neighbors = 0;
+        for (let di = -1; di <= 1; di++) {
+          for (let dj = -1; dj <= 1; dj++) {
+            if (di === 0 && dj === 0) continue;
+            const ni = i + di;
+            const nj = j + dj;
+            if (ni >= 0 && ni < r && nj >= 0 && nj < c) {
+              if (g[ni][nj]) neighbors++;
+            }
+          }
+        }
+        if (g[i][j]) {
+          next[i][j] = neighbors === 2 || neighbors === 3;
+        } else {
+          next[i][j] = neighbors === 3;
+        }
+      }
+    }
+    return next;
+  }
+
+  // ─── Rendering ──────────────────────────────────────────────
+  function render() {
+    const pad = 2;
+    const cellW = CELL_SIZE + GAP;
+    const cw = cols * cellW + pad * 2 + GAP;
+    const ch = rows * cellW + pad * 2 + GAP;
+
+    // Resize canvas
+    if (canvas.width !== cw || canvas.height !== ch) {
+      canvas.width = cw;
+      canvas.height = ch;
+    }
+
+    ctx.fillStyle = CELL_DEAD_BG;
+    ctx.fillRect(0, 0, cw, ch);
+
+    const cs = CELL_SIZE;
+    for (let i = 0; i < rows; i++) {
+      for (let j = 0; j < cols; j++) {
+        const x = pad + j * cellW + GAP;
+        const y = pad + i * cellW + GAP;
+        ctx.fillStyle = grid[i][j] ? CELL_ALIVE_COLOR : '#161b22';
+        ctx.fillRect(x, y, cs, cs);
+        ctx.strokeStyle = CELL_STROKE;
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(x, y, cs, cs);
+      }
+    }
+
+    // Update stats
+    genCount.textContent = generation;
+    popCount.textContent = countPopulation(grid, rows, cols);
+    gridSize.textContent = `${rows}×${cols}`;
+  }
+
+  // ─── URL Management ─────────────────────────────────────────
+  function updateURL(rle) {
+    // Use history.replaceState to avoid hashchange events
+    const newHash = '#' + rle;
+    if (window.location.hash !== newHash) {
+      window.history.replaceState(null, '', newHash);
+    }
+    urlInput.value = window.location.href;
+  }
+
+  function getRLEFromHash() {
+    const hash = window.location.hash;
+    if (hash && hash.length > 1) {
+      return hash.substring(1);
+    }
+    return '';
+  }
+
+  // ─── Initialization ─────────────────────────────────────────
+  function initFromRLE(rleStr) {
+    const parsed = parseRLE(rleStr);
+    if (!parsed) {
+      showError('Invalid RLE. Using default pattern.');
+      const def = parseRLE(DEFAULT_RLE);
+      if (def) {
+        grid = def.grid;
+        rows = def.rows;
+        cols = def.cols;
+      }
+    } else {
+      grid = parsed.grid;
+      rows = parsed.rows;
+      cols = parsed.cols;
+    }
+
+    generation = 0;
+    initialRLE = rleStr || DEFAULT_RLE;
+    hideError();
+    render();
+    updateURL(encodeRLE(grid, rows, cols));
+  }
+
+  function resetToInitial() {
+    stop();
+    initFromRLE(initialRLE);
+  }
+
+  function clearGrid() {
+    stop();
+    grid = createGrid(1, 1);
+    rows = 1;
+    cols = 1;
+    generation = 0;
+    initialRLE = '';
+    render();
+    updateURL('');
+  }
+
+  // ─── Animation Loop ─────────────────────────────────────────
+  function gameLoop(timestamp) {
+    frameId = null;
+
+    if (running) {
+      const interval = 1000 / fps;
+      if (timestamp - lastTickTime >= interval) {
+        grid = stepGrid(grid, rows, cols);
+        generation++;
+        render();
+        updateURL(encodeRLE(grid, rows, cols));
+        lastTickTime = timestamp;
+      }
+      frameId = requestAnimationFrame(gameLoop);
+    }
+  }
+
+  function start() {
+    if (running) return;
+    running = true;
+    lastTickTime = performance.now();
+    frameId = requestAnimationFrame(gameLoop);
+    btnPlay.innerHTML = '⏸ Pause';
+    btnPlay.classList.remove('primary');
+    statusDot.classList.remove('paused');
+    statusText.textContent = 'Running';
+  }
+
+  function stop() {
+    running = false;
+    if (frameId !== null) {
+      cancelAnimationFrame(frameId);
+      frameId = null;
+    }
+    btnPlay.innerHTML = '▶ Play';
+    btnPlay.classList.add('primary');
+    statusDot.classList.add('paused');
+    statusText.textContent = 'Paused';
+  }
+
+  function togglePlay() {
+    if (running) {
+      stop();
+    } else {
+      start();
+    }
+  }
+
+  function step() {
+    if (running) return;
+    grid = stepGrid(grid, rows, cols);
+    generation++;
+    render();
+    updateURL(encodeRLE(grid, rows, cols));
+  }
+
+  // ─── Error Handling ─────────────────────────────────────────
+  function showError(msg) {
+    errorDisplay.textContent = msg;
+    statusDot.classList.add('error');
+  }
+
+  function hideError() {
+    errorDisplay.textContent = '';
+    statusDot.classList.remove('error');
+  }
+
+  // ─── Event Handlers ─────────────────────────────────────────
+  btnPlay.addEventListener('click', togglePlay);
+  btnStep.addEventListener('click', step);
+  btnReset.addEventListener('click', resetToInitial);
+  btnClear.addEventListener('click', clearGrid);
+
+  speedSlider.addEventListener('input', function() {
+    fps = parseInt(this.value, 10);
+    speedVal.textContent = fps + ' fps';
+  });
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', function(e) {
+    // Don't intercept if user is focused on the URL input
+    if (document.activeElement === urlInput) return;
+
+    switch (e.key) {
+      case ' ':
+        e.preventDefault();
+        togglePlay();
+        break;
+      case 's':
+      case 'S':
+        e.preventDefault();
+        step();
+        break;
+      case 'r':
+      case 'R':
+        e.preventDefault();
+        resetToInitial();
+        break;
+      case 'c':
+      case 'C':
+        e.preventDefault();
+        clearGrid();
+        break;
+    }
+  });
+
+  // Canvas click to toggle cells (only when paused)
+  canvas.addEventListener('click', function(e) {
+    if (running) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const mx = (e.clientX - rect.left) * scaleX;
+    const my = (e.clientY - rect.top) * scaleY;
+
+    const pad = 2;
+    const cellW = CELL_SIZE + GAP;
+    const col = Math.floor((mx - pad) / cellW);
+    const row = Math.floor((my - pad) / cellW);
+
+    if (row >= 0 && row < rows && col >= 0 && col < cols) {
+      grid[row][col] = !grid[row][col];
+      render();
+      updateURL(encodeRLE(grid, rows, cols));
+    }
+  });
+
+  // Handle resize
+  window.addEventListener('resize', render);
+
+  // ─── Boot ───────────────────────────────────────────────────
+  const hashRLE = getRLEFromHash();
+  if (hashRLE) {
+    const parsed = parseRLE(hashRLE);
+    if (!parsed) {
+      showError('Malformed RLE in URL hash. Trying default...');
+      initFromRLE(DEFAULT_RLE);
+    } else {
+      initFromRLE(hashRLE);
+    }
+  } else {
+    initFromRLE(DEFAULT_RLE);
+  }
+
+})();
+</script>
+</body>
+</html>
