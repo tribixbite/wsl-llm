@@ -1,0 +1,284 @@
+#!/bin/bash
+set -euo pipefail
+
+# WSL-LLM management CLI
+# Usage: llm [command] [args...]
+
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
+CONFIG_DIR="$HOME/.config/wsl-llm"
+LLAMA_CONF="$HOME/llama-server.conf"
+
+# Load secrets
+[ -f "$CONFIG_DIR/install.env" ] && source "$CONFIG_DIR/install.env" 2>/dev/null || true
+# Load llama-server config for API_KEY, PORT, etc.
+[ -f "$LLAMA_CONF" ] && source "$LLAMA_CONF" 2>/dev/null || true
+
+SERVICES=(llama-server litellm cloudflared)
+
+# ── Helpers ──────────────────────────────────────────────────
+
+usage() {
+    cat <<'EOF'
+WSL-LLM — Local LLM inference stack management
+
+Usage: llm <command> [args...]
+
+Services:
+  start [service]       Start service (default: llama-server)
+  stop [service]        Stop service (default: llama-server)
+  restart [service]     Restart service (default: llama-server)
+  status                Show all services, GPU state, Docker containers
+  logs [service]        Tail logs (default: llama-server)
+  health                Health check all endpoints
+
+Configuration:
+  config [edit]         Show or edit llama-server.conf
+
+Models:
+  model list            List available models in ~/models/
+  model switch FILE     Update config and restart with a different model
+  model download        Download default model from HuggingFace
+
+Benchmarks:
+  bench [quick|full|compare]   Run benchmarks
+
+API Keys (LiteLLM):
+  key create NAME       Create API key for a user
+  key list              List all API keys
+  key revoke KEY        Revoke an API key
+
+Tunnel:
+  tunnel start|stop|status   Manage Cloudflare tunnel
+
+System:
+  info                  System info (GPU, VRAM, PCIe, engines, config)
+  update                Pull repo and rebuild engines
+  help                  Show this help
+EOF
+}
+
+# ── Service Commands ─────────────────────────────────────────
+
+cmd_start() {
+    local svc="${1:-llama-server}"
+    echo "Starting $svc..."
+    sudo /bin/systemctl start "$svc"
+    sleep 2
+    sudo /bin/systemctl status "$svc" --no-pager -l | head -12
+}
+
+cmd_stop() {
+    local svc="${1:-llama-server}"
+    sudo /bin/systemctl stop "$svc"
+    echo "Stopped $svc."
+}
+
+cmd_restart() {
+    local svc="${1:-llama-server}"
+    echo "Restarting $svc..."
+    sudo /bin/systemctl restart "$svc"
+    sleep 2
+    sudo /bin/systemctl status "$svc" --no-pager -l | head -12
+}
+
+cmd_status() {
+    echo "=== Services ==="
+    for svc in "${SERVICES[@]}"; do
+        local state
+        state=$(systemctl is-active "$svc" 2>/dev/null || echo "inactive")
+        printf "  %-25s %s\n" "$svc" "$state"
+    done
+    echo ""
+    echo "=== GPU ==="
+    nvidia-smi --query-gpu=index,name,pstate,power.draw,memory.used,memory.total,pcie.link.gen.current,pcie.link.width.current --format=csv 2>/dev/null || echo "  nvidia-smi not available"
+    echo ""
+    echo "=== Docker ==="
+    docker ps --format "  {{.Names}}	{{.Status}}	{{.Ports}}" 2>/dev/null || echo "  Docker not running"
+}
+
+cmd_logs() {
+    local svc="${1:-llama-server}"
+    journalctl -u "$svc" -f --no-pager
+}
+
+cmd_health() {
+    local key="${API_KEY:-}"
+    echo "=== llama-server (port ${PORT:-8080}) ==="
+    curl -s --max-time 5 -H "Authorization: Bearer $key" "http://localhost:${PORT:-8080}/health" 2>/dev/null | python3 -m json.tool 2>/dev/null || echo "  NOT RESPONDING"
+    echo ""
+    echo "=== LiteLLM (port 4000) ==="
+    curl -s --max-time 5 http://localhost:4000/health 2>/dev/null | python3 -m json.tool 2>/dev/null || echo "  NOT RESPONDING"
+    echo ""
+    echo "=== Open WebUI (port 3000) ==="
+    local code
+    code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://localhost:3000 2>/dev/null || echo "000")
+    echo "  HTTP $code"
+    echo ""
+    echo "=== mcpo (port 8000) ==="
+    local mcpo_code
+    mcpo_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://localhost:8000 2>/dev/null || echo "000")
+    echo "  HTTP $mcpo_code"
+}
+
+# ── Config ───────────────────────────────────────────────────
+
+cmd_config() {
+    if [ "${1:-}" = "edit" ]; then
+        ${EDITOR:-nano} "$LLAMA_CONF"
+        echo "Config updated. Run 'llm restart' to apply."
+    else
+        cat "$LLAMA_CONF" 2>/dev/null || echo "Config not found: $LLAMA_CONF"
+    fi
+}
+
+# ── Model Management ────────────────────────────────────────
+
+cmd_model() {
+    case "${1:-list}" in
+        list)
+            echo "=== Available Models ==="
+            ls -lh ~/models/*.gguf 2>/dev/null || echo "  No models in ~/models/"
+            echo ""
+            echo "=== Active ==="
+            grep "^MODEL=" "$LLAMA_CONF" 2>/dev/null | sed 's/MODEL=/  /' || echo "  No config"
+            ;;
+        switch)
+            local path="${2:?Usage: llm model switch FILE}"
+            [ ! -f "$path" ] && path="$HOME/models/$path"
+            if [ ! -f "$path" ]; then
+                echo "Model not found: $2"
+                echo "Available:"
+                ls ~/models/*.gguf 2>/dev/null | xargs -I{} basename {} | sed 's/^/  /'
+                return 1
+            fi
+            sed -i "s|^MODEL=.*|MODEL=$path|" "$LLAMA_CONF"
+            echo "Switched to: $path"
+            echo "Run 'llm restart' to apply."
+            ;;
+        download)
+            "$REPO_DIR/scripts/download-model.sh" "${2:-}"
+            ;;
+        *)
+            echo "Usage: llm model {list|switch FILE|download}"
+            ;;
+    esac
+}
+
+# ── Benchmarks ───────────────────────────────────────────────
+
+cmd_bench() {
+    "$REPO_DIR/bench/bench.sh" "${1:-quick}"
+}
+
+# ── API Key Management ───────────────────────────────────────
+
+cmd_key() {
+    local master="${LITELLM_MASTER_KEY:-}"
+    if [ -z "$master" ]; then
+        echo "Error: LITELLM_MASTER_KEY not set. Check ~/.config/wsl-llm/install.env"
+        return 1
+    fi
+
+    case "${1:-list}" in
+        create)
+            local name="${2:?Usage: llm key create NAME}"
+            local tmpfile
+            tmpfile=$(mktemp)
+            printf '{"models":["qwen3.5-35b-a3b"],"key_alias":"%s"}' "$name" > "$tmpfile"
+            curl -s http://localhost:4000/key/generate \
+                -H "Authorization: Bearer $master" \
+                -H "Content-Type: application/json" \
+                -d "@$tmpfile" | python3 -m json.tool
+            rm -f "$tmpfile"
+            ;;
+        list)
+            curl -s "http://localhost:4000/key/list" \
+                -H "Authorization: Bearer $master" | python3 -m json.tool 2>/dev/null || echo "LiteLLM not responding"
+            ;;
+        revoke)
+            local key="${2:?Usage: llm key revoke KEY}"
+            local tmpfile
+            tmpfile=$(mktemp)
+            printf '{"keys":["%s"]}' "$key" > "$tmpfile"
+            curl -s http://localhost:4000/key/delete \
+                -H "Authorization: Bearer $master" \
+                -H "Content-Type: application/json" \
+                -d "@$tmpfile" | python3 -m json.tool
+            rm -f "$tmpfile"
+            ;;
+        *)
+            echo "Usage: llm key {create NAME|list|revoke KEY}"
+            ;;
+    esac
+}
+
+# ── Tunnel ───────────────────────────────────────────────────
+
+cmd_tunnel() {
+    case "${1:-status}" in
+        start)  sudo /bin/systemctl start cloudflared; echo "Started." ;;
+        stop)   sudo /bin/systemctl stop cloudflared; echo "Stopped." ;;
+        status) sudo /bin/systemctl status cloudflared --no-pager -l | head -12 ;;
+        *)      echo "Usage: llm tunnel {start|stop|status}" ;;
+    esac
+}
+
+# ── System Info ──────────────────────────────────────────────
+
+cmd_info() {
+    echo "=== System ==="
+    echo "  OS:     $(lsb_release -ds 2>/dev/null || grep PRETTY_NAME /etc/os-release 2>/dev/null | cut -d= -f2 | tr -d '"')"
+    echo "  Kernel: $(uname -r)"
+    echo ""
+    echo "=== GPU ==="
+    nvidia-smi --query-gpu=index,name,driver_version,memory.total,pcie.link.gen.current,pcie.link.width.current --format=csv 2>/dev/null || echo "  nvidia-smi not available"
+    echo ""
+    echo "=== CUDA ==="
+    echo "  $(nvcc --version 2>/dev/null | tail -1 || echo 'nvcc not found')"
+    echo ""
+    echo "=== Engines ==="
+    local ik="$HOME/ik_llama.cpp/build/bin/llama-server"
+    local up="$HOME/llama.cpp/build/bin/llama-server"
+    [ -x "$ik" ] && echo "  ik_llama.cpp: $("$ik" --version 2>&1 | head -1)" || echo "  ik_llama.cpp: not built"
+    [ -x "$up" ] && echo "  llama.cpp:    $("$up" --version 2>&1 | head -1)" || echo "  llama.cpp:    not built"
+    echo ""
+    echo "=== Active Config ==="
+    if [ -f "$LLAMA_CONF" ]; then
+        grep -E "^(MODEL|CONTEXT_SIZE|NUM_SLOTS|KV_TYPE_K|REASONING_BUDGET)" "$LLAMA_CONF" | sed 's/^/  /'
+    else
+        echo "  No config found"
+    fi
+}
+
+# ── Update ───────────────────────────────────────────────────
+
+cmd_update() {
+    echo "Pulling latest repo..."
+    git -C "$REPO_DIR" pull
+    echo ""
+    echo "Rebuilding engines..."
+    "$REPO_DIR/scripts/build-engines.sh"
+    echo ""
+    echo "Done. Run 'llm restart' to use new build."
+}
+
+# ── Main Dispatch ────────────────────────────────────────────
+
+case "${1:-status}" in
+    start)     shift; cmd_start "$@" ;;
+    stop)      shift; cmd_stop "$@" ;;
+    restart)   shift; cmd_restart "$@" ;;
+    status)    cmd_status ;;
+    logs)      shift; cmd_logs "$@" ;;
+    health)    cmd_health ;;
+    config)    shift; cmd_config "$@" ;;
+    model)     shift; cmd_model "$@" ;;
+    bench)     shift; cmd_bench "$@" ;;
+    key)       shift; cmd_key "$@" ;;
+    tunnel)    shift; cmd_tunnel "$@" ;;
+    info)      cmd_info ;;
+    update)    cmd_update ;;
+    help|-h|--help) usage ;;
+    *)         echo "Unknown command: $1"; echo ""; usage; exit 1 ;;
+esac

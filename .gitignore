@@ -50,3 +50,17 @@ dist/
 # Temporary
 tmp/
 temp/
+
+# Generated configs (from templates — contain secrets)
+install.env
+llama-server.conf
+litellm_config.yaml
+mcpo-config.json
+*.generated
+*.bak
+
+# Generated service scripts (from templates)
+services/llama-server-watchdog.sh
+
+# Benchmark results
+*_results.*
