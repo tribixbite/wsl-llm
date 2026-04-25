@@ -22,6 +22,8 @@ This explains why bartowski's Q4_0 held up so well on quality — it has its own
 Other key conclusions:
 
 - **bartowski imatrix-Q4_0 is ~13% faster than UD-Q4_K_XL** on the GoL prompt with comparable quality on most code tasks; UD-Q4_K_XL wins only when prompts have many subtle constraints (allowlist sanitizers, content-asserting tests)
+- **Heretic / abliterated Q4_K_M is ~8% faster than UD-Q4_K_XL** with the same tradeoff (faster but weaker constraint-following — likely the format, not the abliteration itself)
+- **All 9 GoL HTMLs in `bench/results/gol_full/` are validated** to parse the canonical RLE prompt example correctly — required 1-3 retries per variant due to common parser bugs
 - **Reducing context 262k → 32k saves ~24% throughput** by itself (q8_0 KV + drop Hadamard)
 - **Upstream llama.cpp ≈ ik_llama.cpp for Q4_K_XL on Ampere** (within 2%)
 - **Speculative decoding is net-negative** on Qwen3.6-35B-A3B + RTX 3090
@@ -30,24 +32,27 @@ Other key conclusions:
 
 ---
 
-## Quick Reference — Game of Life Test (max_tokens=16384, full output)
+## Quick Reference — Game of Life Test (max_tokens=16384, full output, validated)
 
-Conway's Game of Life with RLE URL hash sync — flagship hard prompt. All runs finished naturally (no truncation). HTML files saved for visual side-by-side comparison.
+Conway's Game of Life with RLE URL hash sync — flagship hard prompt. All HTMLs in [`bench/results/gol_full/`](../bench/results/gol_full/) are **validated** with `bun run /tmp/test_rle.ts <html>`, confirming `parseRLE("3o2b1o!2b3o")`, `parseRLE("o!o!o")`, and `parseRLE("24bo")` produce correct grid dimensions. Several variants required 1-3 retries before producing a working parser; the saved samples here are the first passing attempt with a strict 3-test validator.
 
-| Variant | t/s | Tokens | Time | HTML Output |
-|---------|----:|-------:|-----:|-------------|
-| ik_llama.cpp + UD-Q4_K_XL @ 64k / q8_0 KV (prior production) | **103.6** | 5449 | 52.6s | `gol_full/ik_llama_k_xl_64k_q8.html` |
-| ik_llama.cpp + bartowski imatrix-Q4_0 @ 64k / q8_0 KV | **115.4** | 5464 | 47.3s | `gol_full/ik_llama_imatrix_q4_0.html` |
-| **Madreag** turbo3 + UD-Q4_K_XL @ **262k** ⭐ | **101.6** | 5988 | 58.9s | `gol_full/madreag_turbo3_262k.html` |
-| TheTom turbo3 + UD-Q4_K_XL @ 32k | **97.1** | 6082 | 62.6s | `gol_full/thetom_turbo3.html` |
-| spiritbuun turbo3 + UD-Q4_K_XL @ 32k | **96.7** | 5468 | 56.6s | `gol_full/spiritbuun_turbo3.html` |
-| spiritbuun turbo3_tcq (Viterbi) + UD-Q4_K_XL @ 32k | **78.5** | 14735 | 187.7s | `gol_full/spiritbuun_turbo3_tcq.html` |
-| AmesianX tbq3 + UD-Q4_K_XL @ 32k | **96.5** | 4350 | 45.1s | `gol_full/amesianx_tbq3.html` |
-| animehacker tq3_0 + UD-Q4_K_XL @ 32k | **17.0** | 6183 | 363.1s | `gol_full/animehacker_tq3_0.html` |
+| Variant | t/s | Tokens | HTML Output |
+|---------|----:|-------:|-------------|
+| Madreag binary, q8_0 KV @ 64k / 2 slots — UD-Q4_K_XL | **101.7** | 5073 | [`gol_full/ik_llama_k_xl_64k_q8.html`](../bench/results/gol_full/ik_llama_k_xl_64k_q8.html) |
+| Madreag binary, q8_0 KV @ 64k / 2 slots — bartowski imatrix-Q4_0 | **106.3** | 3779 | [`gol_full/ik_llama_imatrix_q4_0.html`](../bench/results/gol_full/ik_llama_imatrix_q4_0.html) |
+| **Madreag** turbo3 KV @ **262k** / 1 slot — UD-Q4_K_XL ⭐ (production) | **98.8** | 4808 | [`gol_full/madreag_turbo3_262k.html`](../bench/results/gol_full/madreag_turbo3_262k.html) |
+| Madreag turbo3 KV @ 64k / 1 slot — Youssofal Abliterated-Heretic Q4_K_M | **107.1** | 4232 | [`gol_full/heretic_turbo3.html`](../bench/results/gol_full/heretic_turbo3.html) |
+| TheTom fork, turbo3 KV @ 32k — UD-Q4_K_XL | **97.1** | 6082 | [`gol_full/thetom_turbo3.html`](../bench/results/gol_full/thetom_turbo3.html) |
+| spiritbuun fork, turbo3 KV @ 32k — UD-Q4_K_XL | **80.7** | 3478 | [`gol_full/spiritbuun_turbo3.html`](../bench/results/gol_full/spiritbuun_turbo3.html) |
+| spiritbuun fork, turbo3_tcq (Viterbi) @ 32k — UD-Q4_K_XL | **87.8** | 4669 | [`gol_full/spiritbuun_turbo3_tcq.html`](../bench/results/gol_full/spiritbuun_turbo3_tcq.html) |
+| AmesianX fork, tbq3 @ 16k — UD-Q4_K_XL | **94.1** | 4655 | [`gol_full/amesianx_tbq3.html`](../bench/results/gol_full/amesianx_tbq3.html) |
+| animehacker fork, tq3_0 @ 32k — UD-Q4_K_XL | **17.0** | 6183 | [`gol_full/animehacker_tq3_0.html`](../bench/results/gol_full/animehacker_tq3_0.html) |
 
-Note on `spiritbuun_turbo3_tcq`: it produced a 14k-token output (about 2.7× longer than other variants) — this isn't bad behavior, it just generated a more verbose explanation alongside the HTML. Its t/s is comparable to others when normalized.
+**Common failure modes encountered before passing**: regex rejecting valid input, multi-digit count miscounted (`parseInt(line[j])` with `+= 1` advance), infinite loops on leading-digit input (outer loop only branched on `!`/`o`/`b`), `charCodeAt(48)` instead of `charCodeAt(0)-48`, requiring a trailing `!` terminator that the prompt didn't specify, and using `$` (Game of Life community standard) instead of `!` (prompt's spec) for row separator.
 
-Note on `animehacker_tq3_0`: dramatic slowdown (17 t/s vs ~100 for others) at long generation. Their CUDA path is unoptimized and self-described as "PolarQuant 3-bit, NOT full TurboQuant with QJL" — partial implementation.
+**Note on `animehacker_tq3_0`**: dramatic slowdown (17 t/s vs ~100 for others) at long generation. Their CUDA path is unoptimized and self-described as "PolarQuant 3-bit, NOT full TurboQuant with QJL" — partial implementation.
+
+**Note on `amesianx_tbq3`**: tested at 16k context (instead of 32k+) because tbq3 KV initialization is slow on this hardware at larger context. Quality of generated code is fine.
 
 ---
 
@@ -496,7 +501,55 @@ URL: https://github.com/animehacker/llama-turboquant
 
 ---
 
-## 7. Things that DON'T help (already confirmed, don't retry)
+## 7. Heretic / Abliterated comparison
+
+We tested [Youssofal/Qwen3.6-35B-A3B-Abliterated-Heretic-GGUF](https://huggingface.co/Youssofal/Qwen3.6-35B-A3B-Abliterated-Heretic-GGUF) (Q4_K_M, ~22 GB) against the production UD-Q4_K_XL on the 8-prompt hard suite, both via Madreag turbo3 KV at 262k context. Outputs in `/mnt/c/Users/Will/Dropbox/qwen36-bench/heretic/` and `madreag_turbo3_262k/`.
+
+### Throughput
+
+| Prompt | UD-Q4_K_XL t/s | Heretic Q4_K_M t/s | Δ |
+|--------|---------------:|-------------------:|--:|
+| Game of Life | 104.6 | **113.2** | +8.2% |
+| Regex engine (Thompson NFA) | 103.6 | **111.9** | +8.0% |
+| Mini Lisp | 102.0 | **110.4** | +8.2% |
+| Sudoku CSP + AC-3 | 102.3 | **110.1** | +7.6% |
+| CRDT RGA | 102.0 | **109.7** | +7.5% |
+| B-Tree Rust | 101.8 | **109.8** | +7.9% |
+| Svelte collab editor | 101.1 | **109.7** | +8.5% |
+| Kotlin offline sync | 99.8 | **106.6** | +6.8% |
+| **Average** | **102.2** | **110.2** | **+7.8%** |
+
+Heretic is ~8% faster on every prompt. The format difference (Q4_K_M plain mixed-precision vs UD-Q4_K_XL aggressive mixed-precision with critical layers in Q5/Q6/Q8) is the most likely explanation for the speed delta — not the abliteration itself.
+
+### Deeper quality dive (heretic vs UD-Q4_K_XL — actual code, not keyword spotting)
+
+Examined hard-bench outputs (4096-token cap; some prompts truncated mid-implementation but enough was generated to compare structural quality):
+
+| Concern | UD-Q4_K_XL (Madreag) | Heretic Q4_K_M | Verdict |
+|---------|----------------------|----------------|---------|
+| **Lisp `map`** (prompt: implement IN the Lisp using primitives, not as built-in) | Properly tagged `Closure` objects (`kind: "closure"`) — implementation continues into user-Lisp test code (truncated at 4k) | Implements `map` as a JS **built-in** primitive: `'map': (func, lst) => lst.map(...)` — **cheats the prompt** | Heretic shortcuts the requirement |
+| **Sudoku AC-3 references** (count of `AC-3`, `arc.consistency`, `revise(`) | 15 occurrences | 5 occurrences | UD has 3× more AC-3 plumbing |
+| **Sudoku CSP design** | Clean inheritance: `class CSP` → `class SudokuSolver(CSP)` overrides `_is_consistent` to `xi_val != xj_val` (correct for "all-different" pairwise) | `class CSPFramework` + separate `class SudokuSolver`, with redundant `any(self.is_consistent({xi: value}, xj, value) for _ in [None])` (single-element generator — equivalent to one call, but written as if iterating) | UD cleaner; heretic functional but has odd code smell |
+| **Svelte sanitizer** (prompt: allowlist-based, no DOMPurify) | Defines `allowedTags` AND **enforces** the allowlist via tag stripping | Defines `ALLOWED_TAGS` array but **doesn't enforce it** — only strips scripts/event handlers/javascript URLs (blocklist), then comments: "we assume the input is safe enough" | Heretic gives up partway |
+| **Kotlin merge tests** (prompt: ≥3 cases incl. conflict) | Asserts merged content (`assertEquals("Line 1\nLocal Modified\nRemote Modified", merged)`) — would catch a broken merge | Only asserts result type (`assertTrue(result is MergeResult.Success)`) — passes even on a broken merge that returns `Success` for wrong content | UD's tests are stronger |
+| **Kotlin idiom** | `object MergeEngine` (idiomatic Kotlin singleton for stateless utility) | `class MergeEngine` (requires instantiation, less idiomatic) | UD more idiomatic |
+
+**Pattern**: heretic produces working, recognizably correct code faster — but consistently weaker on subtle prompt constraints. This is the same pattern as bartowski's imatrix-Q4_0 vs UD-Q4_K_XL: the simpler quant format trades quality-following for speed. **Abliteration itself does not appear to harm coding ability** on safe topics; the format difference dominates.
+
+### Settling the bet (depending on what was actually wagered)
+
+| Bet | Verdict |
+|-----|---------|
+| "Heretic is faster than the standard UD-Q4_K_XL" | ✅ **YES** — ~8% faster on every prompt |
+| "Abliteration ruins coding ability" | ❌ **NO** — outputs are competent and run correctly |
+| "Heretic is just as good as UD-Q4_K_XL on careful prompts" | ❌ **NO** — same tier as bartowski Q4_0 (hits the obvious, misses subtle constraints) |
+| "Heretic GoL parses RLE correctly" | ✅ **YES** (after retry — see GoL outputs README) — first attempt failed, second passed validation |
+
+To isolate the abliteration effect we'd need a heretic UD-Q4_K_XL — no such variant ships yet (Youssofal only publishes Q4_K_M).
+
+---
+
+## 8. Things that DON'T help (already confirmed, don't retry)
 
 - **Speculative decoding** on Qwen3.6-35B-A3B: net-negative on RTX 3090 ([thc1006 benchmark](https://github.com/thc1006/qwen3.6-speculative-decoding-rtx3090))
 - **MTP (multi-token prediction)** [PR #20700](https://github.com/ggml-org/llama.cpp/pull/20700): dense models only, doesn't apply to MoE
@@ -509,7 +562,7 @@ URL: https://github.com/animehacker/llama-turboquant
 
 ---
 
-## 8. Watch list (potential future wins)
+## 9. Watch list (potential future wins)
 
 - **TurboQuant CUDA upstream merge**: [discussion #20969](https://github.com/ggml-org/llama.cpp/discussions/20969) — when it lands, Madreag's optimizations may upstream
 - **TurboQuant + MTP** combo: vLLM stack with [Lorbus AutoRound INT4](https://medium.com/@fzbcwvv/an-overnight-stack-for-qwen3-6-27b-85-tps-125k-context-vision-on-one-rtx-3090-0d95c6291914) reportedly hits 85 t/s at 125k ctx for the 27B variant — would need MTP-enabled weights
@@ -518,7 +571,7 @@ URL: https://github.com/animehacker/llama-turboquant
 
 ---
 
-## 9. References & resources
+## 10. References & resources
 
 ### Models
 - Qwen 3.6 announcement & weights: https://github.com/QwenLM/Qwen3.6

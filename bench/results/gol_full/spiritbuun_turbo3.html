@@ -3,670 +3,333 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Conway's Game of Life — RLE URL Encoder</title>
+<title>Conway's Game of Life</title>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    background: #0a0a1a;
-    color: #c8ccd4;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-height: 100vh;
-    padding: 20px;
-    user-select: none;
-  }
-
-  h1 {
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: #e0e4ec;
-    margin-bottom: 4px;
-    letter-spacing: -0.02em;
-  }
-
-  .subtitle {
-    font-size: 0.8rem;
-    color: #6b7280;
-    margin-bottom: 16px;
-  }
-
-  #canvas-wrap {
-    position: relative;
-    border: 1px solid #2a2d3a;
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.5);
-    background: #111122;
-  }
-
-  canvas {
-    display: block;
-    cursor: crosshair;
-  }
-
-  #controls {
-    display: flex;
-    gap: 8px;
-    margin: 16px 0;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-
-  button {
-    background: #1e2035;
-    color: #c8ccd4;
-    border: 1px solid #333654;
-    border-radius: 6px;
-    padding: 8px 18px;
-    font-size: 0.85rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    font-family: inherit;
-  }
-
-  button:hover { background: #2a2d4a; border-color: #555880; }
-  button:active { background: #353860; transform: scale(0.97); }
-
-  button.primary {
-    background: #2563eb;
-    border-color: #3b82f6;
-    color: #fff;
-  }
-  button.primary:hover { background: #3b82f6; }
-
-  button.danger {
-    border-color: #7f1d1d;
-    color: #f87171;
-  }
-  button.danger:hover { background: #450a0a; border-color: #991b1b; }
-
-  #info {
-    display: flex;
-    gap: 20px;
-    font-size: 0.8rem;
-    color: #6b7280;
-    margin-bottom: 12px;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-
-  #info span { white-space: nowrap; }
-  #info .val { color: #9ca3af; font-weight: 600; font-variant-numeric: tabular-nums; }
-
-  #url-bar {
-    width: 100%;
-    max-width: 720px;
-    margin-bottom: 12px;
-  }
-
-  #url-bar label {
-    display: block;
-    font-size: 0.75rem;
-    color: #6b7280;
-    margin-bottom: 4px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  #url-bar input {
-    width: 100%;
-    background: #111122;
-    border: 1px solid #2a2d3a;
-    border-radius: 6px;
-    color: #9ca3af;
-    font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
-    font-size: 0.78rem;
-    padding: 8px 12px;
-    outline: none;
-    transition: border-color 0.15s;
-    word-break: break-all;
-  }
-
-  #url-bar input:focus { border-color: #3b82f6; }
-
-  #error {
-    color: #f87171;
-    font-size: 0.8rem;
-    min-height: 1.2em;
-    margin-bottom: 4px;
-    text-align: center;
-  }
-
-  #help {
-    font-size: 0.7rem;
-    color: #4b5563;
-    margin-top: 8px;
-    text-align: center;
-    line-height: 1.6;
-  }
-
-  #help kbd {
-    background: #1e2035;
-    border: 1px solid #333654;
-    border-radius: 3px;
-    padding: 1px 5px;
-    font-family: inherit;
-    font-size: 0.7rem;
-    color: #9ca3af;
-  }
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0d1117;color:#c9d1d9;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:16px}
+h1{font-size:1.6rem;margin-bottom:12px;color:#58a6ff;letter-spacing:-0.5px}
+#toolbar{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;justify-content:center}
+button{background:#21262d;color:#c9d1d9;border:1px solid #30363d;padding:7px 16px;border-radius:6px;cursor:pointer;font-size:13px;font-family:inherit;transition:background .15s,border-color .15s;white-space:nowrap}
+button:hover{background:#30363d;border-color:#8b949e}
+button:active{background:#484f58}
+button.active{background:#1f6feb;border-color:#1f6feb}
+#info{font-size:12px;color:#8b949e;margin-bottom:8px;display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
+#info span{display:inline-flex;align-items:center;gap:4px}
+kbd{background:#161b22;border:1px solid #30363d;border-radius:3px;padding:1px 5px;font-size:11px;font-family:inherit;color:#8b949e}
+canvas{border:1px solid #30363d;border-radius:4px;cursor:crosshair;display:block;background:#010409}
+#status{margin-top:8px;font-size:12px;min-height:18px;text-align:center}
+#error{color:#f85149;font-size:12px;margin-top:8px;text-align:center;max-width:600px;line-height:1.5}
+#urlBar{margin-top:8px;display:flex;align-items:center;gap:6px;width:100%;max-width:700px}
+#urlBar input{flex:1;background:#161b22;border:1px solid #30363d;color:#c9d1d9;padding:6px 10px;border-radius:6px;font-size:12px;font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;outline:none}
+#urlBar input:focus{border-color:#58a6ff}
+#urlBar button{padding:6px 12px;font-size:12px}
 </style>
 </head>
 <body>
-
 <h1>Conway's Game of Life</h1>
-<p class="subtitle">RLE-encoded in the URL — share any frame by copying the link</p>
-
-<div id="error"></div>
-
-<div id="canvas-wrap">
-  <canvas id="canvas"></canvas>
+<div id="toolbar">
+<button id="btnToggle">▶ Start</button>
+<button id="btnStep">⏭ Step</button>
+<button id="btnReset">↺ Reset</button>
+<button id="btnClear">✕ Clear</button>
 </div>
-
-<div id="controls">
-  <button id="btn-play" class="primary">▶ Start</button>
-  <button id="btn-step">⏭ Step</button>
-  <button id="btn-reset">↺ Reset</button>
-  <button id="btn-clear" class="danger">✕ Clear</button>
-</div>
-
 <div id="info">
-  <span>Generation: <span id="gen-val" class="val">0</span></span>
-  <span>Population: <span id="pop-val" class="val">0</span></span>
-  <span>Grid: <span id="dim-val" class="val">0×0</span></span>
+<span>Pop: <strong id="popCount">0</strong></span>
+<span>Tick: <strong id="tickCount">0</strong></span>
+<span>Grid: <strong id="gridSize">0×0</strong></span>
 </div>
-
-<div id="url-bar">
-  <label>Live RLE (URL hash)</label>
-  <input id="url-input" type="text" readonly spellcheck="false" autocomplete="off" />
+<canvas id="canvas"></canvas>
+<div id="status">Ready</div>
+<div id="error"></div>
+<div id="urlBar">
+<input id="urlInput" type="text" placeholder="RLE string or press Reset to restore initial state">
+<button id="btnLoad">Load</button>
 </div>
-
-<div id="help">
-  <kbd>Space</kbd> Play/Pause &nbsp; <kbd>S</kbd> Step &nbsp; <kbd>R</kbd> Reset &nbsp; <kbd>C</kbd> Clear &nbsp; Click grid to toggle (paused)
-</div>
-
 <script>
-(function() {
-  'use strict';
+(function(){
+"use strict";
 
-  // ─── Constants ───────────────────────────────────────────────
-  const CELL_SIZE = 12;
-  const CELL_PAD = 1;
-  const BG_COLOR = '#0e0e1e';
-  const GRID_COLOR = '#1a1a2e';
-  const CELL_COLOR = '#3b82f6';
-  CELL_COLOR_LIGHT = '#60a5fa';
-  const DEFAULT_RLE = 'o!2b3o!'; // default pattern
+/* ── Constants ── */
+const CELL=10, GAP=1, BG='#010409', BG_ALT='#0a0f17', FILL='#3fb950', FILL_ALT='#2ea043';
 
-  // ─── DOM refs ────────────────────────────────────────────────
-  const canvas = document.getElementById('canvas');
-  const ctx = canvas.getContext('2d');
-  const btnPlay = document.getElementById('btn-play');
-  const btnStep = document.getElementById('btn-step');
-  const btnReset = document.getElementById('btn-reset');
-  const btnClear = document.getElementById('btn-clear');
-  const genVal = document.getElementById('gen-val');
-  const popVal = document.getElementById('pop-val');
-  const dimVal = document.getElementById('dim-val');
-  const urlInput = document.getElementById('url-input');
-  const errorEl = document.getElementById('error');
+/* ── DOM refs ── */
+const canvas=document.getElementById('canvas');
+const ctx=canvas.getContext('2d');
+const $toggle=document.getElementById('btnToggle');
+const $step=document.getElementById('btnStep');
+const $reset=document.getElementById('btnReset');
+const $clear=document.getElementById('btnClear');
+const $pop=document.getElementById('popCount');
+const $tick=document.getElementById('tickCount');
+const $grid=document.getElementById('gridSize');
+const $status=document.getElementById('status');
+const $error=document.getElementById('error');
+const $urlInput=document.getElementById('urlInput');
+const $btnLoad=document.getElementById('btnLoad');
 
-  // ─── State ───────────────────────────────────────────────────
-  let grid = null;
-  let rows = 0;
-  let cols = 0;
-  let generation = 0;
-  let running = false;
-  let animId = null;
-  let lastTickTime = 0;
-  const TICK_MS = 120;
-  let urlUpdatePending = false;
-  let isUrlUpdate = false; // flag to prevent hash-change feedback
-  let cellSize = CELL_SIZE;
+/* ── State ── */
+let grid=null, rows=0, cols=0;
+let running=false, animId=null;
+let initHash='', tickNum=0, errorText='';
+let cellOn=false; // for click toggle
 
-  // ─── RLE Parsing ─────────────────────────────────────────────
-  function parseRLE(rle) {
-    if (!rle || typeof rle !== 'string') throw new Error('Empty RLE string');
+/* ── Helpers ── */
+function status(msg){$status.textContent=msg}
+function showError(msg){errorText=msg;$error.textContent=msg}
+function clearError(){$error.textContent='';errorText=''}
 
-    rle = rle.trim();
-    if (rle.length === 0) throw new Error('Empty RLE string');
+function countOnes(g){let n=0;for(let r=0;r<rows;r++)for(let c=0;c<cols;c++)if(g[r][c])n++;return n}
 
-    // Validate: only allowed chars
-    if (!/^[0-9obBlL!]+$/i.test(rle)) {
-      // Try to be helpful - show which chars are bad
-      const bad = rle.replace(/[0-9obBlL!]/gi, '');
-      throw new Error('Invalid RLE characters: "' + bad + '"');
-    }
+function updateInfo(){
+    $pop.textContent=countOnes(grid);
+    $tick.textContent=tickNum;
+    $grid.textContent=cols+'×'+rows;
+}
 
-    const rowStrings = [];
-    let i = 0;
-    const len = rle.length;
-
-    while (i < len) {
-      const ch = rle[i];
-
-      if (ch === '!') {
-        rowStrings.push('');
-        i++;
-        continue;
-      }
-
-      // Parse run length
-      let count = 0;
-      while (i < len && rle[i] >= '0' && rle[i] <= '9') {
-        count = count * 10 + (rle[i] - '0');
-        i++;
-      }
-
-      if (count === 0) count = 1;
-
-      if (i >= len) {
-        throw new Error('RLE ends with run length but no cell type');
-      }
-
-      const type = rle[i].toLowerCase();
-      i++;
-
-      if (type !== 'o' && type !== 'b') {
-        throw new Error('Invalid cell type "' + rle[i - 1] + '" (expected o or b)');
-      }
-
-      rowStrings.push(type.repeat(count));
-    }
-
-    // Remove trailing empty rows (trailing !)
-    while (rowStrings.length > 0 && rowStrings[rowStrings.length - 1] === '') {
-      rowStrings.pop();
-    }
-
-    if (rowStrings.length === 0) {
-      throw new Error('RLE produced no rows');
-    }
-
-    // Compute grid dimensions
-    const maxCols = Math.max(...rowStrings.map(r => r.length));
-    const r = rowStrings.length;
-    const c = maxCols;
-
-    // Build grid (0 = dead, 1 = alive)
-    const g = new Array(r);
-    for (let row = 0; row < r; row++) {
-      const rowStr = rowStrings[row];
-      g[row] = new Uint8Array(c);
-      for (let col = 0; col < c; col++) {
-        if (col < rowStr.length && rowStr[col] === 'o') {
-          g[row][col] = 1;
-        }
-      }
-    }
-
-    return { grid: g, rows: r, cols: c };
-  }
-
-  // ─── RLE Encoding ────────────────────────────────────────────
-  function encodeRLE(g, r, c) {
-    const parts = [];
-    for (let row = 0; row < r; row++) {
-      let runLen = 0;
-      let prevType = null; // 'o' or 'b'
-
-      for (let col = 0; col < c; col++) {
-        const cell = g[row][col];
-        const curType = cell ? 'o' : 'b';
-
-        if (curType !== prevType) {
-          if (runLen > 0) {
-            parts.push((runLen > 1 ? runLen : '') + prevType);
-          }
-          runLen = 1;
-          prevType = curType;
-        } else {
-          runLen++;
-        }
-      }
-      if (runLen > 0) {
-        parts.push((runLen > 1 ? runLen : '') + prevType);
-      }
-
-      if (row < r - 1) {
-        parts.push('!');
-      }
-    }
-    return parts.join('');
-  }
-
-  // ─── URL Hash Management ─────────────────────────────────────
-  function getHash() {
-    return window.location.hash.slice(1);
-  }
-
-  function setHash(rle) {
-    isUrlUpdate = true;
-    window.location.hash = rle;
-    // Use setTimeout to clear the flag after the hash change event fires
-    setTimeout(() => { isUrlUpdate = false; }, 0);
-  }
-
-  function updateUrl() {
-    if (!grid) return;
-    const rle = encodeRLE(grid, rows, cols);
-    setHash(rle);
-    urlInput.value = rle;
-  }
-
-  function loadFromHash() {
-    const hash = getHash();
-    if (hash) {
-      try {
-        const parsed = parseRLE(hash);
-        grid = parsed.grid;
-        rows = parsed.rows;
-        cols = parsed.cols;
-        generation = 0;
-        errorEl.textContent = '';
-        return true;
-      } catch (e) {
-        errorEl.textContent = 'Malformed RLE in URL: ' + e.message;
-        // Fall through to default
-      }
-    }
-    // Default pattern
-    try {
-      const parsed = parseRLE(DEFAULT_RLE);
-      grid = parsed.grid;
-      rows = parsed.rows;
-      cols = parsed.cols;
-      generation = 0;
-      errorEl.textContent = 'Using default pattern (RLE parse failed or empty)';
-      return true;
-    } catch (e) {
-      errorEl.textContent = 'Error: ' + e.message;
-      return false;
-    }
-  }
-
-  // ─── Grid Operations ─────────────────────────────────────────
-  function copyGrid(src, r, c) {
-    const dst = new Array(r);
-    for (let i = 0; i < r; i++) {
-      dst[i] = new Uint8Array(src[i]);
-    }
-    return dst;
-  }
-
-  function countPopulation(g, r, c) {
-    let pop = 0;
-    for (let row = 0; row < r; row++) {
-      for (let col = 0; col < c; col++) {
-        pop += g[row][col];
-      }
-    }
-    return pop;
-  }
-
-  function step() {
-    if (!grid) return;
-    const newGrid = new Array(rows);
-    for (let row = 0; row < rows; row++) {
-      newGrid[row] = new Uint8Array(cols);
-    }
-
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < cols; col++) {
-        let neighbors = 0;
-        for (let dr = -1; dr <= 1; dr++) {
-          for (let dc = -1; dc <= 1; dc++) {
-            if (dr === 0 && dc === 0) continue;
-            const nr = row + dr;
-            const nc = col + dc;
-            if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
-              neighbors += grid[nr][nc];
+/* ── RLE Parsing ── */
+function parseRLE(rle){
+    rle=rle.replace(/\s+/g,'');
+    if(!rle) return null;
+    const rowsArr=[];
+    let i=0;
+    while(i<rle.length){
+        const row=[];
+        while(i<rle.length && rle[i]!=='!'){
+            if(rle[i]==='o'||rle[i]==='b'){
+                row.push(rle[i]==='o');
+                i++;
+            } else if(rle[i]>='1'&&rle[i]<='9'){
+                let num=0;
+                while(i<rle.length&&rle[i]>='0'&&rle[i]<='9'){num=num*10+parseInt(rle[i],10);i++}
+                if(i>=rle.length) throw new Error('RLE: digit '+num+' not followed by cell type (o/b)');
+                if(rle[i]==='o'||rle[i]==='b'){
+                    for(let k=0;k<num;k++) row.push(rle[i]==='o');
+                    i++;
+                } else {
+                    throw new Error('RLE: invalid cell type "'+rle[i]+'" after count '+num);
+                }
+            } else {
+                throw new Error('RLE: unexpected character "'+rle[i]+'" at position '+i);
             }
-          }
         }
-        const alive = grid[row][col];
-        if (alive) {
-          newGrid[row][col] = (neighbors === 2 || neighbors === 3) ? 1 : 0;
-        } else {
-          newGrid[row][col] = (neighbors === 3) ? 1 : 0;
+        if(row.length>0) rowsArr.push(row);
+        if(i<rle.length && rle[i]==='!') i++; // skip '!'
+    }
+    if(rowsArr.length===0) return null;
+    cols=Math.max(...rowsArr.map(r=>r.length));
+    for(let r=0;r<rowsArr.length;r++) while(rowsArr[r].length<cols) rowsArr[r].push(false);
+    return rowsArr;
+}
+
+/* ── Grid Operations ── */
+function cloneGrid(g){return g.map(r=>Array.from(r))}
+
+function step(g){
+    const out=Array.from({length:rows},()=>Array(cols).fill(false));
+    for(let r=0;r<rows;r++){
+        for(let c=0;c<cols;c++){
+            let n=0;
+            for(let dr=-1;dr<=1;dr++) for(let dc=-1;dc<=1;dc++){
+                if(!dr&&!dc) continue;
+                const nr=r+dr, nc=c+dc;
+                if(nr>=0&&nr<rows&&nc>=0&&nc<cols&&g[nr][nc]) n++;
+            }
+            if(g[r][c]) out[r][c]=(n===2||n===3);
+            else out[r][c]=(n===3);
         }
-      }
     }
+    return out;
+}
 
-    grid = newGrid;
-    generation++;
-  }
-
-  function clearGrid() {
-    if (!grid) return;
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < cols; col++) {
-        grid[row][col] = 0;
-      }
+/* ── Rendering ── */
+function render(){
+    const cw=cols*(CELL+GAP)+GAP;
+    const ch=rows*(CELL+GAP)+GAP;
+    if(canvas.width!==cw||canvas.height!==ch){canvas.width=cw;canvas.height=ch}
+    ctx.fillStyle=BG;
+    ctx.fillRect(0,0,cw,ch);
+    for(let r=0;r<rows;r++){
+        for(let c=0;c<cols;c++){
+            const x=c*(CELL+GAP)+GAP, y=r*(CELL+GAP)+GAP;
+            ctx.fillStyle=(grid[r][c])?FILL:BG_ALT;
+            ctx.fillRect(x,y,CELL,CELL);
+        }
     }
-    generation = 0;
-    updateAll();
-  }
+}
 
-  function resetToInitialState() {
-    const hash = getHash();
-    if (hash) {
-      try {
-        const parsed = parseRLE(hash);
-        grid = parsed.grid;
-        rows = parsed.rows;
-        cols = parsed.cols;
-        generation = 0;
-        errorEl.textContent = '';
-        updateAll();
+/* ── URL / Hash ── */
+function gridToRLE(g){
+    let s='';
+    for(let r=0;r<rows;r++){
+        let run=0, prev=-1;
+        for(let c=0;c<cols;c++){
+            const cur=g[r][c]?1:0;
+            if(cur===prev){run++}
+            else{
+                if(prev===1) s+=run+'o';
+                else if(prev===0) s+=run+'b';
+                prev=cur;run=1;
+            }
+        }
+        if(prev===1) s+=run+'o';
+        else if(prev===0) s+=run+'b';
+        s+='!';
+    }
+    return s;
+}
+
+function loadFromHash(){
+    const h=location.hash.slice(1);
+    if(!h){
+        grid=parseRLE('o2o!2b2o!o2o!obo!2o!2b'); // glider 7x6
+        initHash=gridToRLE(grid);
+        tickNum=0;
+        clearError();
         return;
-      } catch (e) {
-        errorEl.textContent = 'Malformed RLE: ' + e.message;
-      }
     }
-    // Fallback: reparse from stored initial or use default
-    loadFromHash();
-    updateAll();
-  }
-
-  // ─── Rendering ───────────────────────────────────────────────
-  function render() {
-    if (!grid) return;
-
-    // Recalculate cell size to fit the window
-    const maxW = Math.min(window.innerWidth - 40, 900);
-    const maxH = Math.min(window.innerHeight - 340, 600);
-    const newCellSize = Math.max(4, Math.min(
-      Math.floor(maxW / cols),
-      Math.floor(maxH / rows)
-    ));
-
-    if (newCellSize !== cellSize) {
-      cellSize = newCellSize;
-      canvas.width = cols * cellSize;
-      canvas.height = rows * cellSize;
+    try{
+        const p=parseRLE(h);
+        if(!p) throw new Error('Empty grid');
+        grid=p;
+        rows=p.length;
+        cols=p[0].length;
+        initHash=h;
+        tickNum=0;
+        clearError();
+    }catch(e){
+        showError('Malformed RLE: '+e.message);
+        grid=null;
+        rows=0;cols=0;
     }
+}
 
-    ctx.fillStyle = BG_COLOR;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+function updateHash(){
+    if(!grid){return}
+    const rle=gridToRLE(grid);
+    if(rle===initHash) location.hash='';
+    else location.hash=rle;
+}
 
-    // Draw grid lines (subtle)
-    if (cellSize >= 8) {
-      ctx.strokeStyle = GRID_COLOR;
-      ctx.lineWidth = 0.5;
-      ctx.beginPath();
-      for (let c = 0; c <= cols; c++) {
-        ctx.moveTo(c * cellSize, 0);
-        ctx.lineTo(c * cellSize, canvas.height);
-      }
-      for (let r = 0; r <= rows; r++) {
-        ctx.moveTo(0, r * cellSize);
-        ctx.lineTo(canvas.width, r * cellSize);
-      }
-      ctx.stroke();
-    }
+/* ── Controls ── */
+function toggleRun(){
+    running=!running;
+    $toggle.textContent=running?'⏸ Pause':'▶ Start';
+    $toggle.classList.toggle('active',running);
+    if(running) animLoop();
+    else if(animId){cancelAnimationFrame(animId);animId=null}
+    status(running?'Running':'Paused');
+}
 
-    // Draw cells
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < cols; col++) {
-        if (grid[row][col]) {
-          ctx.fillStyle = CELL_COLOR;
-          const pad = Math.max(0, Math.floor(cellSize * 0.08));
-          ctx.fillRect(
-            col * cellSize + pad,
-            row * cellSize + pad,
-            cellSize - pad * 2,
-            cellSize - pad * 2
-          );
-        }
-      }
-    }
-  }
-
-  // ─── Update UI ───────────────────────────────────────────────
-  function updateAll() {
+function stepTick(){
+    if(!grid) return;
+    grid=step(grid);
+    tickNum++;
+    updateHash();
     render();
-    genVal.textContent = generation;
-    popVal.textContent = countPopulation(grid, rows, cols);
-    dimVal.textContent = cols + '×' + rows;
-    updateUrl();
-  }
+    updateInfo();
+    status('Stepped → tick '+tickNum);
+}
 
-  // ─── Animation Loop ──────────────────────────────────────────
-  function tick(time) {
-    animId = requestAnimationFrame(tick);
-    if (!running) return;
-
-    if (time - lastTickTime >= TICK_MS) {
-      lastTickTime = time;
-      step();
-      updateAll();
-    }
-  }
-
-  function start() {
-    if (running) return;
-    running = true;
-    lastTickTime = performance.now();
-    btnPlay.textContent = '⏸ Pause';
-    btnPlay.classList.remove('primary');
-    animId = requestAnimationFrame(tick);
-  }
-
-  function pause() {
-    if (!running) return;
-    running = false;
-    btnPlay.textContent = '▶ Start';
-    btnPlay.classList.add('primary');
-    if (animId) {
-      cancelAnimationFrame(animId);
-      animId = null;
-    }
-  }
-
-  function togglePlay() {
-    if (running) pause();
-    else start();
-  }
-
-  // ─── Canvas Click ────────────────────────────────────────────
-  canvas.addEventListener('click', function(e) {
-    if (running) return; // only toggle when paused
-
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
-    const col = Math.floor(mx / (canvas.width / cols));
-    const row = Math.floor(my / (canvas.height / rows));
-
-    if (row >= 0 && row < rows && col >= 0 && col < cols) {
-      grid[row][col] = grid[row][col] ? 0 : 1;
-      updateAll();
-    }
-  });
-
-  // ─── Keyboard Shortcuts ──────────────────────────────────────
-  document.addEventListener('keydown', function(e) {
-    // Don't capture if user is focused on the URL input
-    if (document.activeElement === urlInput) return;
-
-    switch (e.key) {
-      case ' ':
-        e.preventDefault();
-        togglePlay();
-        break;
-      case 's':
-      case 'S':
-        e.preventDefault();
-        pause();
-        step();
-        updateAll();
-        break;
-      case 'r':
-      case 'R':
-        e.preventDefault();
-        pause();
-        resetToInitialState();
-        break;
-      case 'c':
-      case 'C':
-        e.preventDefault();
-        pause();
-        clearGrid();
-        break;
-    }
-  });
-
-  // ─── Hash Change (URL input from another tab or manual edit) ──
-  window.addEventListener('hashchange', function(e) {
-    if (isUrlUpdate) return; // skip if we just set it
-    pause();
+function resetToInit(){
+    stop();
     loadFromHash();
-    updateAll();
-  });
+    if(grid){render();updateInfo();status('Reset to initial state')}
+}
 
-  // ─── URL Input Copy ──────────────────────────────────────────
-  urlInput.addEventListener('click', function() {
-    this.select();
-    try {
-      navigator.clipboard.writeText(this.value).catch(function() {});
-    } catch(e) {}
-  });
+function clearGrid(){
+    stop();
+    if(!grid||cols===0) return;
+    for(let r=0;r<rows;r++) for(let c=0;c<cols;c++) grid[r][c]=false;
+    tickNum=0;
+    updateHash();
+    render();
+    updateInfo();
+    status('Cleared');
+}
 
-  // ─── Init ────────────────────────────────────────────────────
-  function init() {
+function stop(){
+    running=false;
+    $toggle.textContent='▶ Start';
+    $toggle.classList.remove('active');
+    if(animId){cancelAnimationFrame(animId);animId=null}
+}
+
+function loadFromInput(){
+    const val=$urlInput.value.trim();
+    if(!val){resetToInit();return}
+    stop();
+    const h=val;
+    location.hash=h;
     loadFromHash();
-    canvas.width = cols * cellSize;
-    canvas.height = rows * cellSize;
-    updateAll();
+    if(grid){render();updateInfo();status('Loaded RLE → tick 0')}
+}
 
-    btnPlay.addEventListener('click', togglePlay);
-    btnStep.addEventListener('click', function() {
-      pause();
-      step();
-      updateAll();
-    });
-    btnReset.addEventListener('click', function() {
-      pause();
-      resetToInitialState();
-    });
-    btnClear.addEventListener('click', function() {
-      pause();
-      clearGrid();
-    });
+/* ── Animation Loop ── */
+let lastTime=0;
+const TICK_INTERVAL=150;
+function animLoop(timestamp){
+    if(!running) return;
+    if(!lastTime) lastTime=timestamp;
+    if(timestamp-lastTime>=TICK_INTERVAL){
+        grid=step(grid);
+        tickNum++;
+        updateHash();
+        render();
+        updateInfo();
+        lastTime=timestamp;
+    }
+    animId=requestAnimationFrame(animLoop);
+}
 
-    // Handle window resize
-    window.addEventListener('resize', function() {
-      render();
-    });
-  }
+/* ── Click Handling ── */
+canvas.addEventListener('click',function(e){
+    if(!grid||running) return;
+    const rect=canvas.getBoundingClientRect();
+    const sx=canvas.width/rect.width, sy=canvas.height/rect.height;
+    const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+    const c=Math.floor((mx-GAP)/(CELL+GAP));
+    const r=Math.floor((my-GAP)/(CELL+GAP));
+    if(r<0||r>=rows||c<0||c>=cols) return;
+    grid[r][c]=!grid[r][c];
+    updateHash();
+    render();
+    updateInfo();
+});
 
-  init();
+/* ── Keyboard ── */
+document.addEventListener('keydown',function(e){
+    if(e.target.tagName==='INPUT') return;
+    switch(e.key.toLowerCase()){
+        case ' ':e.preventDefault();toggleRun();break;
+        case 's':e.preventDefault();stepTick();break;
+        case 'r':e.preventDefault();resetToInit();break;
+        case 'c':e.preventDefault();clearGrid();break;
+    }
+});
+
+/* ── Hash change (from external input or manual edit) ── */
+window.addEventListener('hashchange',function(){
+    if(location.hash!==initHash){
+        stop();
+        loadFromHash();
+        if(grid){render();updateInfo();status('Hash changed → tick '+tickNum)}
+    }
+});
+
+/* ── Init ── */
+$btnLoad.addEventListener('click',loadFromInput);
+$urlInput.addEventListener('keydown',function(e){if(e.key==='Enter')loadFromInput()});
+
+$toggle.addEventListener('click',toggleRun);
+$step.addEventListener('click',stepTick);
+$reset.addEventListener('click',resetToInit);
+$clear.addEventListener('click',clearGrid);
+
+loadFromHash();
+render();
+updateInfo();
+if(errorText) status('Error loaded'); else status('Ready — press Space to start');
+
 })();
 </script>
 </body>
