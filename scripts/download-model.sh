@@ -14,6 +14,18 @@ MODEL_SIZE="22.4 GiB"
 # Allow overriding for different models
 if [ -n "${1:-}" ]; then
     case "$1" in
+        qwen36-27b)
+            HF_REPO="unsloth/Qwen3.6-27B-GGUF"
+            HF_FILE="Qwen3.6-27B-UD-Q4_K_XL.gguf"
+            MODEL_FILE="Qwen3.6-27B-UD-Q4_K_XL.gguf"
+            MODEL_SIZE="17.6 GiB"
+            ;;
+        qwen36-27b-iq4xs)
+            HF_REPO="unsloth/Qwen3.6-27B-GGUF"
+            HF_FILE="Qwen3.6-27B-IQ4_XS.gguf"
+            MODEL_FILE="Qwen3.6-27B-IQ4_XS.gguf"
+            MODEL_SIZE="15.4 GiB"
+            ;;
         coder-next)
             HF_REPO="unsloth/Qwen3-Coder-Next-GGUF"
             HF_FILE="Qwen3-Coder-Next-UD-Q4_K_XL.gguf"
@@ -28,7 +40,7 @@ if [ -n "${1:-}" ]; then
             ;;
         *)
             echo "Unknown model: $1"
-            echo "Available: (default) qwen3.6, coder-next, qwen35"
+            echo "Available: (default) qwen3.6, qwen36-27b, qwen36-27b-iq4xs, coder-next, qwen35"
             exit 1
             ;;
     esac
