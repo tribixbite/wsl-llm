@@ -24,14 +24,37 @@ if [ "$PROC_COUNT" -gt 1 ]; then
     exit 1
 fi
 
-# Check 2: Health endpoint must respond within 10s
+# Check 2: Health endpoint behavior
+# Codes:
+#   200 = healthy, 503 = model still loading (legitimate during startup),
+#   anything else = stuck or crashed
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
     -H "Authorization: Bearer $API_KEY" "$HEALTH_URL" 2>/dev/null)
 
-if [ "$HTTP_CODE" != "200" ]; then
-    echo "$(date): WATCHDOG: Health check failed (HTTP $HTTP_CODE). Killing."
-    pkill -9 -x llama-server
-    exit 1
-fi
-
-exit 0
+case "$HTTP_CODE" in
+    200)
+        # Healthy
+        exit 0
+        ;;
+    503)
+        # Model is loading. Tolerate during the first 5 minutes after service start.
+        START_TS=$(systemctl show -p ActiveEnterTimestamp --value "$SERVICE" 2>/dev/null)
+        if [ -n "$START_TS" ]; then
+            START_EPOCH=$(date -d "$START_TS" +%s 2>/dev/null || echo 0)
+            NOW=$(date +%s)
+            UPTIME=$((NOW - START_EPOCH))
+            if [ "$UPTIME" -lt 300 ]; then
+                # Still in grace window — service is loading the model
+                exit 0
+            fi
+        fi
+        echo "$(date): WATCHDOG: Health 503 for >5min — model load stuck. Killing."
+        pkill -9 -x llama-server
+        exit 1
+        ;;
+    *)
+        echo "$(date): WATCHDOG: Health check failed (HTTP $HTTP_CODE). Killing."
+        pkill -9 -x llama-server
+        exit 1
+        ;;
+esac
