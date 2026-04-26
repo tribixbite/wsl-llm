@@ -1,0 +1,7 @@
+engine	kv	gen_t_per_s	prompt_t_per_s	vram_mib	tokens
+madreag	turbo3	26.47	188.02	15787	800
+madreag	q8_0	26.01	213.14	17161	800
+ik_llama	q8_0	25.55	135.34	17235	800
+ik_llama	q4_0	25.15	160.72	16211	800
+upstream	q8_0	25.11	264.35	17171	800
+upstream	f16	24.82	240.41	19081	800

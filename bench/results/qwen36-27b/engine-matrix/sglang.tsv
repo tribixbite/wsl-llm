@@ -1,0 +1,7 @@
+config	prompt	gen_t_per_s	vram_mib	tokens	elapsed_s
+default_nospec	prose	0	0	0	0.03
+default_nospec	code	0	0	0	0.03
+default_nospec_bf16	prose	31.78	22330	800	25.17
+default_nospec_bf16	code	32.39	22330	800	24.7
+nextn_n3	prose	43.22	22814	800	18.51
+nextn_n3	code	54.16	22814	800	14.77

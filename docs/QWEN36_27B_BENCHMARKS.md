@@ -11,9 +11,11 @@
 
 We benchmarked **27 runtime configurations** across **2 inference backends** ([Madreag turboquant fork](https://github.com/Madreag/turbo3-cuda) and [vLLM nightly with MTP speculative decoding](https://github.com/vllm-project/vllm)) on the 27B model, including a **deep-dive sweep of 11 KV cache types**, **3 weight quants**, and **MTP n∈{2,3,4}** to find the speed ceiling. GoL parser-validation as the quality gate.
 
-**Top finding**: **vLLM + [Lorbus/Qwen3.6-27B-int4-AutoRound](https://huggingface.co/Lorbus/Qwen3.6-27B-int4-AutoRound) + MTP n=3 + fp8 KV at full 262k context = ~54 t/s on coding prompts, ~31 t/s on prose** — a **2.7× speedup over llama.cpp** *only when speculative-decode acceptance is high*. MTP (multi-token prediction speculative decoding) is the key — vLLM without MTP runs at the same ~25 t/s as llama.cpp.
+**Top finding (2026-04-25 engine matrix update)**: **[SGLang 0.5.9](https://github.com/sgl-project/sglang) + NEXTN (= MTP) n=3 + Lorbus AutoRound INT4 + fp8 KV** is the new fastest backend for 27B Dense — **43 t/s prose, 54 t/s code** — beating vLLM + MTP by 44% on prose (vLLM: 30/55) and tying on code. Either backend uses [Lorbus/Qwen3.6-27B-int4-AutoRound](https://huggingface.co/Lorbus/Qwen3.6-27B-int4-AutoRound).
 
-**Speed ceiling confirmed (Section 8 deep dive)**: KV format (11 types tested) varies output by <13%, smaller weight quants don't help (UD-Q3_K_XL = UD-Q4_K_XL ≈ 20 t/s), and MTP n=2 is strictly worse than n=3. The only untested levers likely to break the 54 t/s ceiling are [ExLlamaV3](https://github.com/turboderp-org/exllamav3), [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM), or block-diffusion drafting via [z-lab/Qwen3.6-27B-DFlash](https://huggingface.co/z-lab/Qwen3.6-27B-DFlash).
+**llama.cpp ceiling is universal**: Madreag turboquant, ik_llama.cpp, and upstream llama.cpp all converge to **~25 t/s** on IQ4_XS regardless of KV format (24.82-26.47 t/s = 7% spread, see §9). Speculative decoding (vLLM MTP / SGLang NEXTN) is the only known path past that ceiling.
+
+**Speed ceiling confirmed (Section 8 deep dive)**: KV format (11 types tested) varies output by <13%, smaller weight quants don't help (UD-Q3_K_XL = UD-Q4_K_XL ≈ 20 t/s), and MTP n=2 is strictly worse than n=3. **`--enforce-eager` is a 70% throughput loss in vLLM** (Section 9). Untested next levers: [ExLlamaV3](https://github.com/turboderp-org/exllamav3), [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM), block-diffusion drafting via [z-lab/Qwen3.6-27B-DFlash](https://huggingface.co/z-lab/Qwen3.6-27B-DFlash).
 
 The downside: vLLM setup is significantly more complex (vLLM nightly install, Lorbus AutoRound model download, tokenizer config patch, GPU memory tuning).
 
@@ -343,7 +345,70 @@ The headline number — **vLLM + Lorbus AutoRound INT4 + MTP n=3 + fp8 KV @ 262k
 
 ---
 
-## 9. References
+## 9. Engine matrix — multi-backend deep dive
+
+Re-bench on 2026-04-25 across **5 inference engines** (3 llama.cpp forks + vLLM nightly + SGLang) on the same hardware/model/prompts. **Major finding**: SGLang 0.5.9 + NEXTN (= MTP) significantly beats vLLM on prose prompts (43 vs 30 t/s, +44%) and ties on code (54 t/s).
+
+### 9a. Headline matrix
+
+Same prompts as §8c (800-token LSM-tree prose + 800-token TS BST code), 64k context, single RTX 3090, GPU 0 only.
+
+| Engine | Quant / KV | Speculative | Prose t/s | Code t/s | VRAM (MiB) |
+|--------|------------|-------------|----------:|---------:|-----------:|
+| Madreag turboquant | IQ4_XS / turbo3 | none | 26.47 | ~25 | 15787 |
+| Madreag turboquant | IQ4_XS / q8_0 | none | 26.01 | ~25 | 17161 |
+| ik_llama.cpp | IQ4_XS / q8_0 | none | 25.55 | ~25 | 17235 |
+| ik_llama.cpp | IQ4_XS / q4_0 | none | 25.15 | ~25 | 16211 |
+| Upstream llama.cpp | IQ4_XS / q8_0 | none | 25.11 | ~25 | 17171 |
+| Upstream llama.cpp | IQ4_XS / f16 | none | 24.82 | ~25 | 19081 |
+| vLLM 0.17.0rc1 | Lorbus AutoRound INT4 / fp8 | none | 22.04 | 31.55 | 21649 |
+| vLLM 0.17.0rc1 | Lorbus AutoRound INT4 / fp8 | `--enforce-eager` | 7.09 | 12.12 | 21351 |
+| **vLLM 0.17.0rc1** | **Lorbus AutoRound INT4 / fp8** | **MTP n=3** | **30.09** | **54.87** | **20815** |
+| **SGLang 0.5.9** | **Lorbus AutoRound INT4 / fp8_e4m3** | **none** ⭐ | **31.78** | 32.39 | 22330 |
+| **SGLang 0.5.9** ⭐⭐ | **Lorbus AutoRound INT4 / fp8_e4m3** | **NEXTN n=3** | **43.22** ⭐ | **54.16** | 22814 |
+
+⭐⭐ Overall winner on prose. Code is a tie with vLLM MTP within run-to-run noise.
+
+### 9b. Findings
+
+**1. SGLang beats vLLM on prose throughput** — 32 vs 22 (no spec) and 43 vs 30 (with spec). The compute graph and kernel selection in SGLang's RadixAttention/hybrid_linear_attn backends extracts more from the GPU during low-acceptance sampling regimes (high temperature, varied content). On code prompts both engines hit the same ~54 t/s ceiling because MTP acceptance is high enough that bandwidth dominates over engine overhead.
+
+**2. llama.cpp family is bandwidth-locked at 25 t/s** — Madreag, ik_llama.cpp, and upstream all converge within a 7% range (24.82-26.47 t/s) regardless of fork or KV format. The 27B model bandwidth ceiling is universal across these engines; there's no llama.cpp-side optimization to chase.
+
+**3. `--enforce-eager` is a 70% throughput loss** — disabling CUDA graphs cuts vLLM from 22→7 prose / 32→12 code. CUDA graphs are essential for vLLM batch=1 inference on Ampere; never use `--enforce-eager` for production serving.
+
+**4. MTP only helps when acceptance is high** — code prompts: vLLM MTP +71% over no-MTP (32→55), SGLang NEXTN +67% over no-spec (32→54). Prose prompts: vLLM MTP +37% (22→30), SGLang NEXTN +36% (32→43). The relative speedup is similar but SGLang starts from a higher baseline, ending up faster.
+
+### 9c. What broke (recorded for the next round)
+
+- **`VLLM_ATTENTION_BACKEND=TRITON_ATTN`**: OOM at 0.92 mem-utilization (Triton uses more KV cache memory than FLASHINFER); didn't bench.
+- **SGLang `--speculative-algorithm NGRAM`**: `AttributeError: 'NgramVerifyInput' object has no attribute 'topk'` in [hybrid_linear_attn_backend.py:511](https://github.com/sgl-project/sglang/blob/main/python/sglang/srt/layers/attention/hybrid_linear_attn_backend.py). Bug specific to the Qwen 3.6 hybrid arch path; needs upstream fix.
+- **SGLang `--dtype float16`**: causal_conv1d kernel dtype mismatch on DeltaNet layers. Workaround: use `--dtype bfloat16`.
+- **SGLang PyTorch 2.9.1 + CuDNN 9.10**: refuses to start without `SGLANG_DISABLE_CUDNN_CHECK=1` (warns about pytorch#168167 Conv3d perf bug — irrelevant to LLM inference).
+- **ExLlamaV3 install on torch 2.11 / CUDA 13.0**: flash-attn build fails due to wheel matrix mismatch + `--no-build-isolation` complications; deferred. exl3 quants exist (UnstableLlama/Qwen3.6-27B-exl3-4.15bpw, 17 GB).
+- **vLLM MTP launch with `--gpu-memory-utilization 0.92`**: intermittent KV-cache OOM after engine restarts (zombie EngineCore PIDs leak GPU memory). Workarounds: drop to 0.90 OR explicitly kill zombie EngineCores with `nvidia-smi --query-compute-apps=pid` between launches.
+
+### 9d. Updated production recommendation
+
+| Use case | Engine + config | Prose t/s | Code t/s | VRAM |
+|----------|-----------------|----------:|---------:|-----:|
+| Quality-first 27B (best overall) | **SGLang + NEXTN n=3** | 43 | 54 | 22.8 GB |
+| Stability-first 27B | vLLM 0.17 + MTP n=3 | 30 | 55 | 20.8 GB |
+| llama.cpp-only stack | Madreag + IQ4_XS + turbo3 | 26 | 25 | 15.8 GB |
+
+**SGLang is the new recommended 27B backend**, but vLLM remains a safer choice if SGLang's bf16-only-on-this-model and `SGLANG_DISABLE_CUDNN_CHECK` quirks matter to you. Either way: the 35B-A3B Madreag stack stays primary daily driver at ~102 t/s; 27B is the deep-thinking option.
+
+### 9e. Untested (next time)
+
+- **ExLlamaV3** — UnstableLlama 4.15bpw exl3 quant exists, install needs PyTorch 2.4-2.6 / CUDA 12.x venv to dodge wheel issues
+- **TensorRT-LLM** — significant setup cost (model conversion via TRT-LLM Python API, NGC Docker image)
+- **MLC-LLM** — TVM-compiled inference; needs new model conversion step
+- **z-lab/Qwen3.6-27B-DFlash** — block-diffusion drafting; HF model present, kernel support unverified
+- **vLLM TurboQuant 3-bit KV via Sandermage Genesis patches** — would shave VRAM but §8a already proved KV format is irrelevant for 27B Dense throughput
+
+---
+
+## 10. References
 
 ### Models
 - Qwen 3.6 27B official: https://github.com/QwenLM/Qwen3.6

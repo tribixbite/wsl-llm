@@ -1,0 +1,6 @@
+config	prompt	gen_t_per_s	vram_mib	tokens	elapsed_s
+default_nospec	prose	22.04	21649	800	36.29
+default_nospec	code	31.55	21649	800	25.36
+eager_nospec	prose	7.09	21351	800	112.91
+eager_nospec	code	12.12	21351	800	66.01
+triton_nospec	prose	CRASH	-	-	-

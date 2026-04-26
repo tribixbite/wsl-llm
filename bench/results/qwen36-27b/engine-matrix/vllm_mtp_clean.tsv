@@ -1,0 +1,3 @@
+config	prompt	gen_t_per_s	vram_mib	tokens	elapsed_s
+mtp3_default	prose	30.09	20815	800	26.59
+mtp3_default	code	54.87	20815	800	14.58
