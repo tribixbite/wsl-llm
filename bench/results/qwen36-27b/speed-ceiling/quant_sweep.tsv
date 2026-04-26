@@ -1,0 +1,4 @@
+model	t_per_s	prompt_t_per_s	vram_mib	tokens
+iq4xs_baseline	25.24	182.1	15787	800
+ud_q4_k_xl	20.4	180.3	17859	800
+ud_q3_k_xl	20.05	171.64	14865	800

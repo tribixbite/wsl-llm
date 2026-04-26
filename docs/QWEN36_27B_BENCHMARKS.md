@@ -9,9 +9,11 @@
 
 ## Executive Summary
 
-We benchmarked **8 runtime configurations** across **2 inference backends** ([Madreag turboquant fork](https://github.com/Madreag/turbo3-cuda) and [vLLM nightly with MTP speculative decoding](https://github.com/vllm-project/vllm)) on the 27B model, using GoL parser-validation as the quality gate.
+We benchmarked **27 runtime configurations** across **2 inference backends** ([Madreag turboquant fork](https://github.com/Madreag/turbo3-cuda) and [vLLM nightly with MTP speculative decoding](https://github.com/vllm-project/vllm)) on the 27B model, including a **deep-dive sweep of 11 KV cache types**, **3 weight quants**, and **MTP n∈{2,3,4}** to find the speed ceiling. GoL parser-validation as the quality gate.
 
-**Top finding**: **vLLM + [Lorbus/Qwen3.6-27B-int4-AutoRound](https://huggingface.co/Lorbus/Qwen3.6-27B-int4-AutoRound) + MTP n=3 + fp8 KV at full 262k context = ~54 t/s** — a **2.7× speedup** over llama.cpp-family backends. MTP (multi-token prediction speculative decoding) is the key — vLLM without MTP runs at the same ~25 t/s as llama.cpp.
+**Top finding**: **vLLM + [Lorbus/Qwen3.6-27B-int4-AutoRound](https://huggingface.co/Lorbus/Qwen3.6-27B-int4-AutoRound) + MTP n=3 + fp8 KV at full 262k context = ~54 t/s on coding prompts, ~31 t/s on prose** — a **2.7× speedup over llama.cpp** *only when speculative-decode acceptance is high*. MTP (multi-token prediction speculative decoding) is the key — vLLM without MTP runs at the same ~25 t/s as llama.cpp.
+
+**Speed ceiling confirmed (Section 8 deep dive)**: KV format (11 types tested) varies output by <13%, smaller weight quants don't help (UD-Q3_K_XL = UD-Q4_K_XL ≈ 20 t/s), and MTP n=2 is strictly worse than n=3. The only untested levers likely to break the 54 t/s ceiling are [ExLlamaV3](https://github.com/turboderp-org/exllamav3), [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM), or block-diffusion drafting via [z-lab/Qwen3.6-27B-DFlash](https://huggingface.co/z-lab/Qwen3.6-27B-DFlash).
 
 The downside: vLLM setup is significantly more complex (vLLM nightly install, Lorbus AutoRound model download, tokenizer config patch, GPU memory tuning).
 
@@ -269,7 +271,79 @@ The two models can co-exist on different ports (35B-A3B on 8080, 27B on 8081) bu
 
 ---
 
-## 8. References
+## 8. Speed ceiling investigation — what actually moves 27B Dense t/s
+
+Re-bench on 2026-04-25 to settle whether **KV format**, **smaller weight quants**, or **alternative MTP step counts** can beat the existing 24 t/s (Madreag llama.cpp) / 54 t/s (vLLM+MTP) ceilings. All same hardware, single RTX 3090, GPU 0 only. Bench prompt: 800-token "explain LSM trees" (prose, low MTP acceptance) — chosen so all backends finish quickly and produce comparable steady-state generation rates.
+
+### 8a. KV cache format — full sweep on Madreag IQ4_XS @ 64k
+
+Madreag fork supports 11 KV types (`f16, bf16, q8_0, q4_0, q4_1, iq4_nl, q5_0, q5_1, turbo1.5, turbo2, turbo3, turbo4, turbo3_tcq, turbo2_tcq`). We tested all 11 with K and V both set to the same type:
+
+| KV type | gen t/s | prompt t/s | VRAM (MiB) | Notes |
+|---------|--------:|-----------:|-----------:|-------|
+| **turbo3** ⭐ | **27.28** | 224.20 | 15787 | Best — 3.125 bpv, fastest decode kernel |
+| q8_0 | 26.89 | 260.49 | 17161 | Fastest prompt processing (highest precision) |
+| bf16 | 26.34 | 270.22 | 19081 | Highest VRAM, no quality compromise |
+| q4_0 | 26.08 | 208.80 | 16137 | |
+| iq4_nl | 25.50 | 164.46 | 16107 | |
+| q5_0 | 25.09 | 192.34 | 16393 | |
+| turbo1.5 | 24.52 | 202.57 | 16011 | Lowest bpv non-tcq |
+| turbo2 | 24.31 | 203.01 | 15735 | |
+| turbo4 | 24.23 | 202.17 | 16075 | Higher bpv didn't help |
+| turbo3_tcq | 24.22 | 171.15 | 15821 | Transform-coded variant; same speed |
+| turbo2_tcq | 24.00 | 201.40 | 15565 | Lowest VRAM; slowest decode |
+
+**Range: 24.0 – 27.3 t/s = 13% spread.** turbo3 wins by ~1 t/s over q8_0 and bf16, but the gap is within run-to-run noise. **KV format does not unlock 27B Dense throughput.**
+
+### 8b. Smaller weight quants on Madreag (turbo3 KV @ 64k)
+
+| Quant | File size | gen t/s | VRAM (MiB) | Notes |
+|-------|----------:|--------:|-----------:|-------|
+| Qwen3.6-27B-IQ4_XS | 15.4 GB | **25.24** | 15787 | Madreag's tuned llama.cpp kernel path |
+| Qwen3.6-27B-UD-Q4_K_XL | 17.6 GB | 20.40 | 17859 | UD mixed-tier blocks (Q4/Q5/Q6) |
+| Qwen3.6-27B-UD-Q3_K_XL | 14.5 GB | 20.05 | 14865 | UD mixed-tier — **smaller file but no faster** |
+
+**Surprise**: UD-Q3_K_XL (14.5 GB on disk) is **not faster than UD-Q4_K_XL** despite ~3 GB less weight bandwidth on paper. Reason: Unsloth's UD ("dynamic") quants use mixed Q3/Q5/Q6/Q8 blocks for sensitive tensors, so effective bandwidth ≠ filesize. **IQ4_XS still wins** because it hits Madreag's specialized IQ-flavored kernel — pure Q3_K_S (12.4 GB plain) wasn't tested but would likely fall in the 22-25 t/s band based on the kernel-path effect.
+
+### 8c. vLLM MTP num_speculative_tokens — n=2 vs n=3, same prompt
+
+Same vLLM/Lorbus/fp8/64k config; only `num_speculative_tokens` varied. Same 800-token LSM-tree prompt:
+
+| MTP n | gen t/s | VRAM (MiB) | Notes |
+|------:|--------:|-----------:|-------|
+| 2 | 29.37 | 22327 | Lower acceptance rate per [vLLM warning](https://github.com/vllm-project/vllm/blob/main/vllm/config/speculative.py): "Enabling num_speculative_tokens > 1 will run multiple times of forward on same MTP layer, which may result in lower acceptance rate" |
+| **3** ⭐ | **31.06** | 22339 | Production target, MTP head trained for n=3 |
+| 4 | crash | — | CUDA illegal memory access (already documented) |
+
+**n=3 wins by ~6%** even on prose; the gap widens dramatically on coding prompts (54 t/s GoL vs 31 t/s LSM-prose). MTP acceptance rate is **prompt-content-dependent**: predictable patterns (code, structured output) accept far better than novel prose.
+
+### 8d. Why 27B Dense is bandwidth-bound — the math
+
+| Backend | Effective bandwidth | Observed t/s | Theoretical ceiling | Utilization |
+|---------|--------------------:|-------------:|--------------------:|------------:|
+| Madreag IQ4_XS | 15.4 GB / token | 25 | 936 / 15.4 = **60.7 t/s** | 41% |
+| Madreag UD-Q4_K_XL | 17.6 GB | 20 | 936 / 17.6 = **53.2** | 38% |
+| vLLM Lorbus INT4 (no MTP) | ~14 GB | 25 | 936 / 14 = **66.9** | 37% |
+| vLLM + MTP n=3 (code) | ~14 GB / 2.7 tok per pass | **54** | 66.9 × 2.7 = **180** | 30% (real) |
+
+RTX 3090 ≈ 936 GB/s memory bandwidth. The 30-41% utilization gap is compute overhead (matmul, attention, softmax) that doesn't get amortized further. Speculative decoding is the only known path past the bandwidth ceiling.
+
+### 8e. Untried levers ranked by expected upside
+
+The following weren't tested but are the only paths likely to materially exceed 54 t/s on 27B Dense + 1× RTX 3090:
+
+| Lever | Expected gain | Cost / risk |
+|-------|---------------|-------------|
+| [ExLlamaV3 (turboderp)](https://github.com/turboderp-org/exllamav3) | +30-60% (35-45 t/s baseline) | Hand-tuned Ampere kernels, but no MTP support yet — would lose the 2.7× spec-decode multiplier |
+| [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM) | unknown (5-30% over vLLM) | Days of setup, separate weight conversion |
+| [z-lab/Qwen3.6-27B-DFlash](https://huggingface.co/z-lab/Qwen3.6-27B-DFlash) (block-diffusion drafting) | claimed 4× over MTP | Untested on Dense 27B; HF model exists but kernel support unverified |
+| [Sandermage Genesis vLLM patches](https://medium.com/@fzbcwvv/an-overnight-stack-for-qwen3-6-27b-85-tps-125k-context-vision-on-one-rtx-3090-0d95c6291914) (TurboQuant 3-bit KV) | +0% speed (memory only) | Already proved KV format doesn't matter for 27B |
+
+The headline number — **vLLM + Lorbus AutoRound INT4 + MTP n=3 + fp8 KV @ 262k = ~54 t/s on coding tasks, ~31 t/s on prose** — remains the production ceiling on this hardware until ExLlamaV3 ships MTP support or DFlash gains traction.
+
+---
+
+## 9. References
 
 ### Models
 - Qwen 3.6 27B official: https://github.com/QwenLM/Qwen3.6
