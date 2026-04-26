@@ -408,7 +408,65 @@ Same prompts as §8c (800-token LSM-tree prose + 800-token TS BST code), 64k con
 
 ---
 
-## 10. References
+## 10. Push to 80 t/s
+
+User asked us to push past the 54 t/s SGLang ceiling toward **80 t/s**. Three research agents (HF/MCP, SGLang DeepWiki, vLLM DeepWiki) ran in parallel while we ran 4 phases of bench. **Final result: 64.15 t/s code, 51 t/s prose. Did not reach 80.**
+
+Artifacts: [bench/results/qwen36-27b/push-to-80/](../bench/results/qwen36-27b/push-to-80/).
+
+### 10a. New best results
+
+| Config | Prose t/s | Code t/s | VRAM |
+|--------|----------:|---------:|-----:|
+| **SGLang NEXTN n3 topk=2 draft=8** ⭐ best balanced | **50.57** | 55.56 | 23.1 GB |
+| **SGLang NEXTN n5 topk=1 draft=6** ⭐ best code | 42.51 | **64.15** | 22.9 GB |
+
+Both beat the §9 baseline (43/54). Tree spec with `topk=2` adds +17% to prose; deep chain with `n_steps=5` adds +18% to code (counter to received wisdom that n>=4 is wasteful — high-acceptance code patterns extend usable depth).
+
+### 10b. What we tested that didn't help
+
+| Lever | Best result | Verdict |
+|-------|-------------|---------|
+| SGLang NEXTN tree breadth `topk=4`, draft≥10 | OOM at 0.86 mem-util | Doesn't fit on 24 GB |
+| SGLang accept-threshold-single 0.7 / 0.5 | Same or worse than 1.0 | SGLang threshold semantics ≠ EAGLE literature |
+| SGLang NEXTN `n_steps=6` | 37/57 | Past the optimum, falls off |
+| **DFlash via [spiritbuun/buun-llama-cpp](https://github.com/spiritbuun/buun-llama-cpp) fork** + [DFlash drafter Q8](https://huggingface.co/spiritbuun/Qwen3.6-27B-DFlash-GGUF) | 18 / 45 | Underperformed both vLLM-MTP and SGLang-NEXTN |
+| vLLM `cudagraph_mode=FULL_DECODE_ONLY` | 23 / 33 | Rejected — `FlashInferBackend` only supports `UNIFORM_SINGLE_TOKEN_DECODE` with spec; falls back to PIECEWISE |
+| vLLM MTP n=1 | 27 / 45 | Worse than n=3; Lorbus head trained for n=3 |
+| AWQ Marlin (hampsonw with MTP head) | not tested | 28.9 GB — wouldn't fit |
+| FP4 / NVFP4 / MXFP4 quants | not applicable | All require Hopper/Blackwell tensor cores |
+| EAGLE-3 head | not available | No published Qwen3.6-27B EAGLE-3 head exists yet |
+
+### 10c. Why 80 t/s is hard
+
+Three ceilings stacked:
+1. **Bandwidth**: 27B at INT4 = 14-17 GB/token. RTX 3090 = 936 GB/s. Theoretical no-spec ceiling = ~60 t/s. Observed: 25-32 t/s = 41-54% utilization.
+2. **MTP acceptance decay** (per HPC-AI bench): pos1 97%, pos2 95%, pos3 91%, pos4 21%. Past n=3 you're paying for forward passes that mostly miss. (Code is the exception — n=5 chains accept enough on predictable patterns to net out positive.)
+3. **No EAGLE-3 head for Qwen3.6-27B** exists yet. EAGLE-3 typically delivers 3-4× over baseline vs MTP's ~2× — that's the missing factor between 64 and 80.
+
+### 10d. Realistic paths to 80 t/s
+
+| Path | Cost | Expected t/s |
+|------|------|-------------|
+| Train custom EAGLE-3 head via [SpecForge](https://github.com/sgl-project/SpecForge), LoRA | ~6h overnight on RTX 3090 + small calibration corpus | **80-100 t/s** if EAGLE-3 ratio holds |
+| Wait for community EAGLE-3 head | unknown | same |
+| Apply [Sandermage Genesis vLLM patches](https://medium.com/@fzbcwvv/an-overnight-stack-for-qwen3-6-27b-85-tps-125k-context-vision-on-one-rtx-3090-0d95c6291914) (`turboquant_3bit_nc` KV) | Half day patching vLLM 0.17 | 85 t/s reported |
+| Switch to RTX 4090 (Ada, 1008 GB/s, sm_89) | $1.5k hardware | linear bandwidth bump → ~70 t/s code without other changes |
+| Switch to H100 (Hopper, 3.35 TB/s, sm_90) | data-center hardware | comfortably 200+ t/s with current stack |
+
+### 10e. Updated production recommendation
+
+| Workload | Engine + config | Prose | Code |
+|----------|-----------------|------:|-----:|
+| Mixed prose + code (default) | **SGLang + NEXTN n=3, topk=2, draft=8** | 51 | 56 |
+| Code-heavy | **SGLang + NEXTN n=5, topk=1, draft=6** | 42 | 64 |
+| Stability over speed | vLLM 0.17 + MTP n=3 | 30 | 55 |
+
+The `dev` recommendation is **mixed/balanced** since user prompts vary. Switch to code-only config when running long agentic coding sessions.
+
+---
+
+## 11. References
 
 ### Models
 - Qwen 3.6 27B official: https://github.com/QwenLM/Qwen3.6

@@ -1,0 +1,14 @@
+config	num_steps	topk	draft_tok	thresh_s	thresh_a	prompt	gen_t_per_s	tokens
+n3_k2_d8_t07	3	2	8	0.7	0.9	prose	51.05	800
+n3_k2_d8_t07	3	2	8	0.7	0.9	code	56.3	800
+n5_k1_d6_t07	5	1	6	0.7	0.9	prose	46.06	800
+n5_k1_d6_t07	5	1	6	0.7	0.9	code	51.09	800
+n5_k1_d6_t05	5	1	6	0.5	0.9	prose	43.74	800
+n5_k1_d6_t05	5	1	6	0.5	0.9	code	58.65	800
+n5_k2_d10	5	2	10	1.0	1.0	prose	CRASH	-
+n5_k2_d10_t07	5	2	10	0.7	0.9	prose	CRASH	-
+n6_k1_d7	6	1	7	1.0	1.0	prose	37.16	800
+n6_k1_d7	6	1	7	1.0	1.0	code	57.51	800
+n6_k1_d7_t07	6	1	7	0.7	0.9	prose	41.82	800
+n6_k1_d7_t07	6	1	7	0.7	0.9	code	48.08	800
+auto_tune	0	0	0	1.0	1.0	prose	CRASH	-

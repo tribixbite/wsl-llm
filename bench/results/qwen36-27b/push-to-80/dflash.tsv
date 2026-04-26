@@ -1,0 +1,7 @@
+config	prompt	gen_t_per_s	prompt_t_per_s	vram_mib	tokens
+dflash_default	prose	18.18	116.18	20679	800
+dflash_default	code	44.82	419.51	20679	800
+dflash_topk4	prose	CRASH	-	-	-
+dflash_topk8	prose	CRASH	-	-	-
+dflash_auto	prose	18.87	130.31	21113	800
+dflash_auto	code	44.97	411.28	21113	800
