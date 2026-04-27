@@ -1,0 +1,42 @@
+{
+  "model": "qwen3.6-27b",
+  "endpoint": "http://192.168.1.32:8081",
+  "benchmark": "lcb-v6",
+  "passed": 4,
+  "total": 5,
+  "pass_at_1": 0.8,
+  "wall_s": 103.65737700462341,
+  "gen_s": 102.20074462890625,
+  "bon": 1,
+  "temperature": 0.2,
+  "max_tokens": 2048,
+  "per_difficulty": {
+    "easy": {
+      "passed": 3,
+      "total": 3,
+      "pass_rate": 1.0
+    },
+    "medium": {
+      "passed": 1,
+      "total": 2,
+      "pass_rate": 0.5
+    },
+    "hard": {
+      "passed": 0,
+      "total": 0,
+      "pass_rate": 0.0
+    },
+    "unknown": {
+      "passed": 0,
+      "total": 0,
+      "pass_rate": 0.0
+    }
+  },
+  "per_problem": {
+    "1873_A": true,
+    "1873_B": true,
+    "1873_D": true,
+    "1883_B": false,
+    "1883_C": true
+  }
+}

@@ -1,0 +1,227 @@
+Here is a complete, thread-safe implementation of an LRU Cache in Kotlin using the standard library.
+
+It uses a `ConcurrentHashMap` for O(1) key lookup and a custom Doubly Linked List to maintain insertion/access order. Synchronization is handled via `synchronized` blocks to ensure thread safety.
+
+```kotlin
+import java.util.concurrent.ConcurrentHashMap
+
+/**
+ * A thread-safe LRU (Least Recently Used) Cache implementation.
+ * 
+ * @param capacity The maximum number of entries the cache can hold.
+ */
+class LRUCache<K, V>(private val capacity: Int) {
+
+    // Map for O(1) retrieval of Node by Key
+    private val map = ConcurrentHashMap<K, Node<K, V>>()
+
+    // Head and Tail sentinels for the Doubly Linked List
+    // Head represents the Most Recently Used (MRU)
+    // Tail represents the Least Recently Used (LRU)
+    private val head = Node<K, V>(null, null)
+    private val tail = Node<K, V>(null, null)
+
+    init {
+        // Link sentinels
+        head.next = tail
+        tail.prev = head
+    }
+
+    /**
+     * Returns the value to which the specified key is mapped, or null if this cache
+     * contains no mapping for the key.
+     * Accessing a key moves it to the front (MRU).
+     */
+    fun get(key: K): V? {
+        synchronized(this) {
+            val node = map[key] ?: return null
+            // Move accessed node to front
+            moveToHead(node)
+            return node.value
+        }
+    }
+
+    /**
+     * Inserts or updates a key-value pair.
+     * If the cache is at capacity, the LRU item (Tail.prev) is evicted.
+     */
+    fun put(key: K, value: V) {
+        synchronized(this) {
+            val node = map[key]
+
+            if (node != null) {
+                // Update existing value
+                node.value = value
+                moveToHead(node)
+            } else {
+                // Insert new node
+                val newNode = Node(key, value)
+                map[key] = newNode
+                addToHead(newNode)
+
+                // Check capacity
+                if (map.size > capacity) {
+                    val lruNode = removeTail()
+                    map.remove(lruNode.key)
+                }
+            }
+        }
+    }
+
+    /**
+     * Returns the current number of items in the cache.
+     */
+    fun size(): Int {
+        return map.size
+    }
+
+    // --- Internal Doubly Linked List Operations ---
+
+    // Add node right after Head (MRU position)
+    private fun addToHead(node: Node<K, V>) {
+        node.prev = head
+        node.next = head.next
+        head.next?.prev = node
+        head.next = node
+    }
+
+    // Remove node from its current position in the list
+    private fun removeNode(node: Node<K, V>) {
+        node.prev?.next = node.next
+        node.next?.prev = node.prev
+        node.prev = null
+        node.next = null
+    }
+
+    // Remove node and add it to the Head (MRU position)
+    private fun moveToHead(node: Node<K, V>) {
+        removeNode(node)
+        addToHead(node)
+    }
+
+    // Remove the node before Tail (LRU position) and return it
+    private fun removeTail(): Node<K, V> {
+        val lru = tail.prev
+        if (lru != head) {
+            removeNode(lru)
+        }
+        return lru!!
+    }
+
+    // --- Internal Node Class ---
+    private class Node<K, V>(var key: K, var value: V) {
+        var prev: Node<K, V>? = null
+        var next: Node<K, V>? = null
+    }
+}
+
+// --- Test Cases ---
+
+fun main() {
+    println("Running LRU Cache Tests...\n")
+
+    // Test 1: Basic Put and Get
+    println("Test 1: Basic Put/Get")
+    val cache1 = LRUCache<String, Int>(2)
+    cache1.put("A", 1)
+    cache1.put("B", 2)
+    assert(cache1.get("A") == 1) { "Failed: Expected 1" }
+    assert(cache1.get("B") == 2) { "Failed: Expected 2" }
+    println("  PASSED\n")
+
+    // Test 2: Eviction (LRU item removed when full)
+    println("Test 2: Eviction")
+    val cache2 = LRUCache<String, Int>(2)
+    cache2.put("A", 1)
+    cache2.put("B", 2)
+    cache2.put("C", 3) // Evicts A
+    assert(cache2.get("A") == null) { "Failed: A should be evicted" }
+    assert(cache2.get("B") == 2) { "Failed: B should exist" }
+    assert(cache2.get("C") == 3) { "Failed: C should exist" }
+    println("  PASSED\n")
+
+    // Test 3: Update existing key moves it to MRU
+    println("Test 3: Update moves to MRU")
+    val cache3 = LRUCache<String, Int>(2)
+    cache3.put("A", 1)
+    cache3.put("B", 2)
+    cache3.put("A", 10) // Updates A, moves A to MRU. Order: A, B
+    cache3.put("C", 3)  // Evicts B (LRU). Order: C, A
+    assert(cache3.get("B") == null) { "Failed: B should be evicted" }
+    assert(cache3.get("A") == 10) { "Failed: A should be 10" }
+    assert(cache3.get("C") == 3) { "Failed: C should be 3" }
+    println("  PASSED\n")
+
+    // Test 4: Accessing a key moves it to MRU
+    println("Test 4: Access moves to MRU")
+    val cache4 = LRUCache<String, Int>(2)
+    cache4.put("A", 1)
+    cache4.put("B", 2)
+    cache4.get("A") // Access A. Order: A, B
+    cache4.put("C", 3) // Evicts B (LRU). Order: C, A
+    assert(cache4.get("B") == null) { "Failed: B should be evicted" }
+    assert(cache4.get("A") == 1) { "Failed: A should exist" }
+    println("  PASSED\n")
+
+    // Test 5: Size tracking
+    println("Test 5: Size tracking")
+    val cache5 = LRUCache<String, Int>(3)
+    assert(cache5.size() == 0) { "Failed: Size should be 0" }
+    cache5.put("A", 1)
+    assert(cache5.size() == 1) { "Failed: Size should be 1" }
+    cache5.put("B", 2)
+    assert(cache5.size() == 2) { "Failed: Size should be 2" }
+    cache5.put("C", 3)
+    assert(cache5.size() == 3) { "Failed: Size should be 3" }
+    cache5.put("D", 4) // Evicts A
+    assert(cache5.size() == 3) { "Failed: Size should remain 3" }
+    println("  PASSED\n")
+
+    // Test 6: Capacity of 1
+    println("Test 6: Capacity of 1")
+    val cache6 = LRUCache<String, Int>(1)
+    cache6.put("A", 1)
+    assert(cache6.get("A") == 1) { "Failed: A should be 1" }
+    cache6.put("B", 2) // Evicts A
+    assert(cache6.get("A") == null) { "Failed: A should be evicted" }
+    assert(cache6.get("B") == 2) { "Failed: B should be 2" }
+    println("  PASSED\n")
+
+    // Test 7: Complex Eviction Order
+    println("Test 7: Complex Eviction Order")
+    val cache7 = LRUCache<String, Int>(3)
+    cache7.put("A", 1)
+    cache7.put("B", 2)
+    cache7.put("C", 3)
+    cache7.get("A") // Order: A, C, B (B is LRU)
+    cache7.put("D", 4) // Evicts B. Order: D, A, C
+    assert(cache7.get("B") == null) { "Failed: B should be evicted" }
+    assert(cache7.get("A") == 1) { "Failed: A should exist" }
+    assert(cache7.get("C") == 3) { "Failed: C should exist" }
+    assert(cache7.get("D") == 4) { "Failed: D should exist" }
+    println("  PASSED\n")
+
+    println("All tests passed successfully!")
+}
+```
+
+### Key Implementation Details:
+
+1.  **Thread Safety**:
+    *   The `ConcurrentHashMap` is used for key storage, but since we are manipulating the linked list pointers (which are not atomic operations), we wrap the critical sections (`get`, `put`) in `synchronized(this)` blocks. This ensures that the state of the linked list and the map remain consistent across threads.
+    *   Alternatively, one could use a `ReentrantReadWriteLock` for better read performance, but `synchronized` is simpler and sufficient for most LRU use cases.
+
+2.  **O(1) Operations**:
+    *   `get(key)`: O(1) map lookup + O(1) pointer manipulation to move the node to the head.
+    *   `put(key, value)`: O(1) map lookup/insertion + O(1) pointer manipulation to add to head or remove from tail.
+
+3.  **Doubly Linked List**:
+    *   Uses sentinel nodes (`head` and `tail`) to simplify edge cases (e.g., removing from an empty list or adding to an empty list).
+    *   `head.next` is the Most Recently Used (MRU).
+    *   `tail.prev` is the Least Recently Used (LRU).
+
+4.  **Generic**:
+    *   The class is generic `<K, V>`, allowing it to store any key-value pairs.
+
+5.  **Tests**:
+    *   7 test cases cover basic operations, eviction logic, update behavior, access-based reordering, size tracking, edge cases (capacity 1), and complex eviction orders. All tests use assertions to verify correctness.

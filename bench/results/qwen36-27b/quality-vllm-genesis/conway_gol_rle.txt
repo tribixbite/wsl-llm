@@ -1,0 +1,365 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Game of Life — xRLE</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;background:#111;color:#ccc;font:13px/1.4 monospace}
+#app{display:flex;flex-direction:column;height:100%}
+#toolbar{display:flex;align-items:center;gap:6px;padding:6px 10px;background:#1a1a2e;flex-wrap:wrap;flex-shrink:0}
+#toolbar button{padding:5px 14px;border:1px solid #444;border-radius:4px;background:#2a2a4a;color:#ddd;cursor:pointer;font:13px monospace;transition:background .15s}
+#toolbar button:hover{background:#3a3a6a}
+#toolbar button.active{background:#e94560;border-color:#e94560;color:#fff}
+#status{margin-left:auto;font-size:12px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px}
+#canvasWrap{flex:1;overflow:auto;position:relative;cursor:crosshair}
+canvas{display:block}
+#hashBar{padding:3px 10px;background:#1a1a2e;border-top:1px solid #333;font:11px monospace;overflow:auto;max-height:36px;flex-shrink:0}
+#hashBar span{color:#e94560}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="toolbar">
+    <button id="btnPlay">▶ Play</button>
+    <button id="btnStep">⏭ Step</button>
+    <button id="btnReset">↺ Reset</button>
+    <button id="btnClear">✕ Clear</button>
+    <span id="status">Press Play to start</span>
+  </div>
+  <div id="canvasWrap"><canvas id="cv"></canvas></div>
+  <div id="hashBar"><span>hash:</span> <span id="hashText"></span></div>
+</div>
+<script>
+(function(){
+"use strict";
+
+const CELL=12;
+const TICK_MS=100;
+const EMPTY=-1;
+
+/* ── State ─────────────────────────────────────── */
+let grid=[], cols=0, rows=0;
+let initialHash="", paused=true, gen=0;
+let tickId=null, lastTick=0;
+
+/* ── DOM refs ──────────────────────────────────── */
+const cv=document.getElementById("cv");
+const ctx=cv.getContext("2d");
+const wrap=document.getElementById("canvasWrap");
+const statusEl=document.getElementById("status");
+const hashText=document.getElementById("hashText");
+
+/* ══════════════════════════════════════════════════
+   xRLE  parsing  &  encoding
+   ══════════════════════════════════════════════════ */
+
+function parseRLE(str){
+  str=str.replace(/#/g,"").replace(/\s+/g,"").toLowerCase();
+  if(!str)return null;
+  const rows=[];let row=[];let n=0;
+  for(let i=0;i<str.length;i++){
+    const c=str[i];
+    if(c>="0"&&c<="9"){n=n*10+parseInt(c);continue}
+    let count=n||1; n=0;
+    if(c==="b"){for(let k=0;k<count;k++)row.push(0)}
+    else if(c==="o"){for(let k=0;k<count;k++)row.push(1)}
+    else if(c==="$"){if(row.length)rows.push(row);row=[]}
+    else if(c==="?"){for(let k=0;k<count;k++)row.push(2)}
+    else if(c==="!")break;
+    else{for(let k=0;k<count;k++)row.push(0)}
+  }
+  if(row.length)rows.push(row);
+  if(!rows.length)return null;
+  let w=0;for(const r of rows)if(r.length>w)w=r.length;
+  for(const r of rows)while(r.length<w)r.push(0);
+  return{rows,w};
+}
+
+function encodeRLE(g,c,r){
+  let out="x";
+  out+=" size "+c+" "+r+" ";
+  let pat="";
+  for(let y=0;y<r;y++){
+    let i=0;
+    while(i<c){
+      const v=g[y][i];
+      const ch=v===1?"o":"b";
+      let run=1;
+      while(i+run<c&&g[y][i+run]===v)run++;
+      if(run>1)pat+=run;
+      pat+=ch;
+      i+=run;
+    }
+    if(y<r-1)pat+="$";
+  }
+  pat+="!";
+  out+="; "+pat;
+  return out;
+}
+
+/* ═════════════════════════────────────────────────
+   Grid helpers
+   ══════════════════════════════════════════════════ */
+
+function emptyGrid(c,r){
+  const g=[];
+  for(let y=0;y<r;y++){const row=new Array(c);row.fill(0);g.push(row)}
+  return g;
+}
+
+function padGrid(g,c,r){
+  const p=3;
+  const nc=c+2*p, nr=r+2*p;
+  const ng=emptyGrid(nc,nr);
+  for(let y=0;y<r;y++)for(let x=0;x<c;x++)ng[y+p][x+p]=g[y][x];
+  return{grid:ng,cols:nc,rows:nr,pad:p};
+}
+
+function unpadGrid(ng,nc,nr,p){
+  const g=[];
+  for(let y=p;y<nr-p;y++){
+    const row=[];
+    for(let x=p;x<nc-p;x++)row.push(ng[y][x]);
+    g.push(row);
+  }
+  return{grid:g,cols:nc-2*p,rows:nr-2*p};
+}
+
+function stepGrid(g,c,r){
+  const ng=emptyGrid(c,r);
+  for(let y=0;y<r;y++)for(let x=0;x<c;x++){
+    let n=0;
+    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+      if(!dx&&!dy)continue;
+      const ny=y+dy,nx=x+dx;
+      if(ny>=0&&ny<r&&nx>=0&&nx<c&&g[ny][nx]===1)n++;
+    }
+    if(g[y][x]===1)ng[y][x]=n===2||n===3?1:0;
+    else ng[y][x]=n===3?1:0;
+  }
+  return ng;
+}
+
+function countAlive(g,c,r){
+  let n=0;
+  for(let y=0;y<r;y++)for(let x=0;x<c;x++)if(g[y][x]===1)n++;
+  return n;
+}
+
+/* ══════════════════════════════════════════════════
+   Hash management
+   ══════════════════════════════════════════════════ */
+
+function updateHash(){
+  const raw=encodeRLE(grid,cols,rows);
+  // encode for URL
+  const encoded=encodeURIComponent(raw);
+  if(history.replaceState)history.replaceState(null,"","#"+encoded);
+  else location.hash=encoded;
+  hashText.textContent=raw;
+}
+
+function readHash(){
+  const h=location.hash.slice(1);
+  if(!h)return null;
+  try{return decodeURIComponent(h)}catch(e){return h}
+}
+
+/* ══════════════════════════════════════════════════
+   Rendering
+   ══════════════════════════════════════════════════ */
+
+function render(){
+  if(!cols||!rows)return;
+  const wc=cols*CELL, wr=rows*CELL;
+  cv.width=wc; cv.height=wr;
+  ctx.fillStyle="#111";
+  ctx.fillRect(0,0,wc,wr);
+  // draw alive cells
+  ctx.fillStyle="#e94560";
+  for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){
+    if(grid[y][x]===1){
+      ctx.fillRect(x*CELL+1,y*CELL+1,CELL-2,CELL-2);
+    }
+  }
+  // grid lines
+  ctx.strokeStyle="#222";
+  ctx.lineWidth=0.5;
+  ctx.beginPath();
+  for(let x=0;x<=cols;x++){ctx.moveTo(x*CELL,0);ctx.lineTo(x*CELL,wr)}
+  for(let y=0;y<=rows;y++){ctx.moveTo(0,y*CELL);ctx.lineTo(wc,y*CELL)}
+  ctx.stroke();
+}
+
+/* ══════════════════════════════════════════════════
+   Game logic
+   ══════════════════════════════════════════════════ */
+
+function tick(){
+  const padded=padGrid(grid,cols,rows);
+  const next=stepGrid(padded.grid,padded.cols,padded.rows);
+  const un=unpadGrid(next,padded.cols,padded.rows,padded.pad);
+  grid=un.grid; cols=un.cols; rows=un.rows;
+  gen++;
+  render();
+  updateHash();
+  updateStatus();
+}
+
+function step(){
+  tick();
+}
+
+function toggleCell(x,y){
+  if(x<0||x>=cols||y<0||y>=rows)return;
+  grid[y][x]=grid[y][x]===1?0:1;
+  gen++;
+  render();
+  updateHash();
+  updateStatus();
+}
+
+function updateStatus(){
+  const alive=countAlive(grid,cols,rows);
+  const p=paused?"⏸ Paused":"▶ Running";
+  statusEl.textContent=p+"  Gen "+gen+"  Cells "+alive+"  Grid "+cols+"×"+rows;
+}
+
+/* ══════════════════════════════════════════════════
+   Animation loop
+   ══════════════════════════════════════════════════ */
+
+function loop(ts){
+  if(paused){tickId=null;return}
+  if(ts-lastTick>=TICK_MS){
+    lastTick=ts;
+    tick();
+  }
+  tickId=requestAnimationFrame(loop);
+}
+
+function play(){
+  if(!paused)return;
+  paused=false;
+  lastTick=performance.now();
+  tickId=requestAnimationFrame(loop);
+  document.getElementById("btnPlay").textContent="⏸ Pause";
+  document.getElementById("btnPlay").classList.add("active");
+  updateStatus();
+}
+
+function pause(){
+  if(paused)return;
+  paused=true;
+  if(tickId){cancelAnimationFrame(tickId);tickId=null}
+  document.getElementById("btnPlay").textContent="▶ Play";
+  document.getElementById("btnPlay").classList.remove("active");
+  updateStatus();
+}
+
+function reset(){
+  pause();
+  loadFromHash(initialHash);
+  gen=0;
+  updateStatus();
+}
+
+function clearAll(){
+  pause();
+  grid=[];cols=0;rows=0;gen=0;
+  render();
+  updateHash();
+  updateStatus();
+}
+
+/* ══════════════════════════════════════════════════
+   Initialization
+   ══════════════════════════════════════════════════ */
+
+function loadFromHash(hashStr){
+  if(!hashStr){
+    // default glider at top-left
+    grid=[
+      [0,1,0],
+      [0,0,1],
+      [1,1,1]
+    ];
+    cols=3;rows=3;
+    return;
+  }
+  const parsed=parseRLE(hashStr);
+  if(!parsed){
+    grid=[[1]];cols=1;rows=1;
+    return;
+  }
+  grid=parsed.rows;
+  cols=parsed.w;
+  rows=parsed.rows.length;
+}
+
+function init(){
+  initialHash=readHash()||"";
+  loadFromHash(initialHash);
+  render();
+  updateHash();
+  updateStatus();
+
+  // buttons
+  document.getElementById("btnPlay").addEventListener("click",function(){
+    paused?play():pause();
+  });
+  document.getElementById("btnStep").addEventListener("click",function(){
+    pause();step();
+  });
+  document.getElementById("btnReset").addEventListener("click",reset);
+  document.getElementById("btnClear").addEventListener("click",clearAll);
+
+  // click on canvas
+  cv.addEventListener("click",function(e){
+    if(!paused)return; // only toggle when paused
+    const rect=cv.getBoundingClientRect();
+    const x=Math.floor((e.clientX-rect.left)/CELL);
+    const y=Math.floor((e.clientY-rect.top)/CELL);
+    toggleCell(x,y);
+  });
+
+  // keyboard shortcuts
+  document.addEventListener("keydown",function(e){
+    if(e.target.tagName==="INPUT")return;
+    if(e.key===" "||e.key==="p"){e.preventDefault();paused?play():pause()}
+    else if(e.key==="n"||e.key==="s"){e.preventDefault();pause();step()}
+    else if(e.key==="r"){e.preventDefault();reset()}
+  });
+}
+
+init();
+})();
+</script>
+</body>
+</html>
+```
+
+## Features
+
+- **xRLE Parsing**: Reads patterns from the URL hash (`#...`) in standard RLE format — `o` (alive), `b` (dead), `$` (new row), `!` (end), with optional run-length prefixes. `#` comments and whitespace are stripped.
+
+- **Default Glider**: If no hash is provided, a glider appears in the top-left corner.
+
+- **10 FPS Tick**: Uses `requestAnimationFrame` with a 100ms throttle for smooth 10 fps gameplay.
+
+- **Controls**:
+  - **Play/Pause** — toggle animation
+  - **Step** — advance one generation (pauses first)
+  - **Reset** — restore the original pattern from the initial hash
+  - **Clear** — empty the grid
+
+- **Click-to-toggle**: When paused, click any cell on the canvas to toggle it alive/dead.
+
+- **Hash Encoding**: Every state change (tick, click, clear) encodes the current grid back into the URL hash as a proper `xRLE` string (`x size W H ; pattern!`), so you can copy the URL to share the pattern.
+
+- **Keyboard**: Space/P = play/pause, N/S = step, R = reset.
+
+- **Zero dependencies**, fully self-contained, ~11 KB.

@@ -1,0 +1,636 @@
+```python
+"""
+Pure Python regular-expression engine using Thompson's NFA construction.
+
+Supports:
+- Literal characters
+- '.' (any character)
+- '*' (zero or more)
+- '+' (one or more)
+- '?' (zero or one)
+- '|' (alternation)
+- Parentheses for grouping
+- [...] character classes (with ranges and negation)
+- \d, \w, \s (shorthand character classes)
+- Anchors: ^ and $
+- Escaped metacharacters (e.g., \., \*, \\, etc.)
+
+Uses Thompson's NFA construction and set-of-states simulation (no backtracking).
+"""
+
+import re as stdlib_re  # Only for testing purposes, not used in the engine itself
+
+
+# ==============================================================================
+# NFA State and NFA classes
+# ==============================================================================
+
+class State:
+    """A state in the NFA."""
+    _next_id = 0
+
+    def __init__(self):
+        self.id = State._next_id
+        State._next_id += 1
+        self.out = []  # List of (char_pattern, target_state) or (None, target_state) for epsilon
+
+    def __repr__(self):
+        return f"State({self.id})"
+
+
+class NFA:
+    """
+    A Thompson NFA fragment with a start state and a list of accept states.
+    In Thompson's construction, each fragment has one start state and one accept state.
+    We'll represent the NFA as having a single start state and a single accept state.
+    """
+
+    def __init__(self, start, accept):
+        self.start = start
+        self.accept = accept
+
+    def __repr__(self):
+        return f"NFA(start={self.start}, accept={self.accept})"
+
+
+# ==============================================================================
+# Character class representation
+# ==============================================================================
+
+class CharClass:
+    """
+    Represents a character class that can match one character.
+    Can be a single character, a set of characters, a range, or a negated set.
+    """
+
+    def __init__(self, chars=None, negated=False, any_char=False):
+        """
+        Args:
+            chars: set of characters that match
+            negated: if True, matches characters NOT in chars
+            any_char: if True, matches any character (like '.')
+        """
+        self.chars = chars if chars else set()
+        self.negated = negated
+        self.any_char = any_char
+
+    def matches(self, c):
+        """Check if character c matches this character class."""
+        if self.any_char:
+            return True
+        if self.negated:
+            return c not in self.chars
+        return c in self.chars
+
+    def __repr__(self):
+        if self.any_char:
+            return "AnyChar"
+        if self.negated:
+            return f"NegatedCharClass({self.chars})"
+        return f"CharClass({self.chars})"
+
+
+# ==============================================================================
+# Predefined character classes
+# ==============================================================================
+
+def get_digit_chars():
+    return set('0123456789')
+
+def get_word_chars():
+    return set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_')
+
+def get_space_chars():
+    return set(' \t\n\r\f\v')
+
+
+# ==============================================================================
+# Parser: convert regex pattern string into an NFA
+# ==============================================================================
+
+class RegexParser:
+    """
+    Parses a regex pattern string and builds a Thompson NFA.
+    """
+
+    def __init__(self, pattern):
+        self.pattern = pattern
+        self.pos = 0
+        self.length = len(pattern)
+
+    def peek(self):
+        if self.pos < self.length:
+            return self.pattern[self.pos]
+        return None
+
+    def advance(self):
+        ch = self.peek()
+        self.pos += 1
+        return ch
+
+    def parse(self):
+        """Parse the entire pattern and return an NFA."""
+        nfa = self.parse_alternation()
+        return nfa
+
+    def parse_alternation(self):
+        """Parse alternation: expr | expr | ..."""
+        left = self.parse_concatenation()
+
+        while self.peek() == '|':
+            self.advance()  # consume '|'
+            right = self.parse_concatenation()
+            left = self.make_alternation(left, right)
+
+        return left
+
+    def parse_concatenation(self):
+        """Parse concatenation: expr expr ..."""
+        nfas = []
+
+        # Check for start anchor
+        if self.peek() == '^':
+            self.advance()
+            # Create a special anchor NFA that matches start of string
+            nfa = self.make_start_anchor()
+            nfas.append(nfa)
+
+        while self.peek() is not None and self.peek() not in ('|', ')'):
+            nfa = self.parse_quantifier()
+            nfas.append(nfa)
+
+        # If no expressions were parsed (empty), create an epsilon NFA
+        if not nfas:
+            return self.make_epsilon()
+
+        # Concatenate all NFAs
+        result = nfas[0]
+        for i in range(1, len(nfas)):
+            result = self.make_concatenation(result, nfais[i])
+
+        # Check for end anchor
+        if self.peek() == '$':
+            self.advance()
+            result = self.make_end_anchor(result)
+
+        return result
+
+    def parse_quantifier(self):
+        """Parse an atom followed by an optional quantifier (*, +, ?)."""
+        nfa = self.parse_atom()
+
+        if self.peek() == '*':
+            self.advance()
+            return self.make_star(nfa)
+        elif self.peek() == '+':
+            self.advance()
+            return self.make_plus(nfa)
+        elif self.peek() == '?':
+            self.advance()
+            return self.make_optional(nfa)
+
+        return nfa
+
+    def parse_atom(self):
+        """Parse a single atom: literal, '.', [...], (...), or escape sequence."""
+        ch = self.peek()
+
+        if ch == '(':
+            self.advance()  # consume '('
+            nfa = self.parse_alternation()
+            if self.peek() == ')':
+                self.advance()  # consume ')'
+            else:
+                raise ValueError("Unmatched '(' in regex pattern")
+            return nfa
+
+        elif ch == '[':
+            return self.parse_char_class()
+
+        elif ch == '.':
+            self.advance()
+            return self.make_any_char()
+
+        elif ch == '\\':
+            return self.parse_escape()
+
+        elif ch == '^' or ch == '$':
+            # These are anchors, but they should be handled at the concatenation level
+            # If we encounter them here, it's an error in parsing order
+            # Actually, ^ and $ are handled in parse_concatenation
+            raise ValueError(f"Unexpected anchor '{ch}' in atom position")
+
+        else:
+            # Literal character
+            self.advance()
+            return self.make_literal(ch)
+
+    def parse_char_class(self):
+        """Parse a character class [...]"""
+        self.advance()  # consume '['
+
+        negated = False
+        if self.peek() == '^':
+            negated = True
+            self.advance()
+
+        chars = set()
+
+        # Handle special case: ']' as first character
+        if self.peek() == ']':
+            chars.add(']')
+            self.advance()
+
+        while self.peek() is not None and self.peek() != ']':
+            ch = self.peek()
+
+            if ch == '\\' and self.pos + 1 < self.length:
+                # Escape sequence inside character class
+                self.advance()  # consume '\'
+                next_ch = self.advance()
+                chars.add(next_ch)
+            elif self.pos + 2 < self.length and self.pattern[self.pos + 1] == '-':
+                # Range: a-z
+                start_ch = ch
+                self.advance()  # consume start char
+                self.advance()  # consume '-'
+                end_ch = self.peek()
+                if end_ch == '\\' and self.pos + 1 < self.length:
+                    self.advance()  # consume '\'
+                    end_ch = self.advance()
+                else:
+                    self.advance()  # consume end char
+
+                for c in range(ord(start_ch), ord(end_ch) + 1):
+                    chars.add(chr(c))
+            else:
+                chars.add(ch)
+                self.advance()
+
+        if self.peek() == ']':
+            self.advance()  # consume ']'
+        else:
+            raise ValueError("Unmatched '[' in regex pattern")
+
+        char_class = CharClass(chars=chars, negated=negated)
+        return self.make_char_class(char_class)
+
+    def parse_escape(self):
+        """Parse an escape sequence like \d, \w, \s, \., etc."""
+        self.advance()  # consume '\'
+        next_ch = self.peek()
+        if next_ch is None:
+            raise ValueError("Incomplete escape sequence in regex pattern")
+
+        if next_ch == 'd':
+            self.advance()
+            char_class = CharClass(chars=get_digit_chars())
+            return self.make_char_class(char_class)
+        elif next_ch == 'w':
+            self.advance()
+            char_class = CharClass(chars=get_word_chars())
+            return self.make_char_class(char_class)
+        elif next_ch == 's':
+            self.advance()
+            char_class = CharClass(chars=get_space_chars())
+            return self.make_char_class(char_class)
+        elif next_ch in ('.', '*', '+', '?', '|', '(', ')', '[', ']', '^', '$', '\\'):
+            self.advance()
+            return self.make_literal(next_ch)
+        else:
+            # Treat as literal
+            self.advance()
+            return self.make_literal(next_ch)
+
+    # -------------------------------------------------------------------------
+    # NFA Construction Helpers
+    # -------------------------------------------------------------------------
+
+    def make_epsilon(self):
+        """Create an NFA that matches the empty string (epsilon)."""
+        start = State()
+        accept = State()
+        start.out.append((None, accept))
+        return NFA(start, accept)
+
+    def make_literal(self, ch):
+        """Create an NFA that matches a single literal character."""
+        start = State()
+        accept = State()
+        char_class = CharClass(chars={ch})
+        start.out.append((char_class, accept))
+        return NFA(start, accept)
+
+    def make_any_char(self):
+        """Create an NFA that matches any character ('.')."""
+        start = State()
+        accept = State()
+        char_class = CharClass(any_char=True)
+        start.out.append((char_class, accept))
+        return NFA(start, accept)
+
+    def make_char_class(self, char_class):
+        """Create an NFA that matches a character class."""
+        start = State()
+        accept = State()
+        start.out.append((char_class, accept))
+        return NFA(start, accept)
+
+    def make_start_anchor(self):
+        """Create an NFA that matches the start of the string."""
+        start = State()
+        accept = State()
+        # Use a special marker for start anchor
+        start.out.append(('^', accept))
+        return NFA(start, accept)
+
+    def make_end_anchor(self, nfa):
+        """Append an end anchor to an existing NFA."""
+        # Create an end anchor NFA
+        start = State()
+        accept = State()
+        start.out.append(('$', accept))
+        end_nfa = NFA(start, accept)
+
+        return self.make_concatenation(nfa, end_nfa)
+
+    def make_concatenation(self, nfa1, nfa2):
+        """Concatenate two NFAs: nfa1 followed by nfa2."""
+        # Connect nfa1's accept state to nfa2's start state via epsilon
+        nfa1.accept.out.append((None, nfa2.start))
+        return NFA(nfa1.start, nfa2.accept)
+
+    def make_alternation(self, nfa1, nfa2):
+        """Create an NFA that matches either nfa1 or nfa2."""
+        start = State()
+        accept = State()
+        start.out.append((None, nfa1.start))
+        start.out.append((None, nfa2.start))
+        nfa1.accept.out.append((None, accept))
+        nfa2.accept.out.append((None, accept))
+        return NFA(start, accept)
+
+    def make_star(self, nfa):
+        """Create an NFA that matches nfa zero or more times (*)."""
+        start = State()
+        accept = State()
+        start.out.append((None, nfa.start))
+        start.out.append((None, accept))
+        nfa.accept.out.append((None, nfa.start))
+        nfa.accept.out.append((None, accept))
+        return NFA(start, accept)
+
+    def make_plus(self, nfa):
+        """Create an NFA that matches nfa one or more times (+)."""
+        start = State()
+        accept = State()
+        start.out.append((None, nfa.start))
+        nfa.accept.out.append((None, nfa.start))
+        nfa.accept.out.append((None, accept))
+        return NFA(start, accept)
+
+    def make_optional(self, nfa):
+        """Create an NFA that matches nfa zero or one time (?)."""
+        start = State()
+        accept = State()
+        start.out.append((None, nfa.start))
+        start.out.append((None, accept))
+        nfa.accept.out.append((None, accept))
+        return NFA(start, accept)
+
+
+# ==============================================================================
+# NFA Simulator
+# ==============================================================================
+
+def epsilon_closure(states):
+    """
+    Compute the epsilon closure of a set of states.
+    Returns a set of states reachable via epsilon transitions.
+    """
+    closure = set()
+    stack = list(states)
+
+    while stack:
+        state = stack.pop()
+        if state in closure:
+            continue
+        closure.add(state)
+        for (char_class, target) in state.out:
+            if char_class is None:  # Epsilon transition
+                if target not in closure:
+                    stack.append(target)
+
+    return closure
+
+
+def match_nfa(nfa, text):
+    """
+    Simulate the NFA on the given text using Thompson's set-of-states algorithm.
+    Returns True if the NFA accepts the text, False otherwise.
+    """
+    # Current set of states
+    current_states = epsilon_closure({nfa.start})
+
+    # Track whether we're at the start for ^ anchor
+    at_start = True
+
+    for i, ch in enumerate(text):
+        next_states = set()
+
+        for state in current_states:
+            for (char_class, target) in state.out:
+                if char_class is None:
+                    # Epsilon transition - already handled by epsilon_closure
+                    continue
+                elif char_class == '^':
+                    # Start anchor: only valid at position 0
+                    if i == 0:
+                        next_states.add(target)
+                elif char_class == '$':
+                    # End anchor: only valid at the end of the string
+                    # We'll handle this after the loop
+                    pass
+                elif isinstance(char_class, CharClass):
+                    if char_class.matches(ch):
+                        next_states.add(target)
+                else:
+                    # Literal character match
+                    if char_class == ch:
+                        next_states.add(target)
+
+        current_states = epsilon_closure(next_states)
+        at_start = False
+
+    # After processing all characters, check if any current state can reach accept via $
+    # We need to check if accept is reachable from current states via epsilon and $ transitions
+    # Actually, let's handle $ anchor properly:
+
+    # Check if accept state is in the epsilon closure of current states
+    # But we also need to handle $ anchor which should match at the end
+
+    # Let's do a final epsilon closure and check
+    final_states = epsilon_closure(current_states)
+
+    # Check if accept is in final_states
+    if nfa.accept in final_states:
+        return True
+
+    # Also check if we can reach accept via $ anchor from current states
+    for state in current_states:
+        for (char_class, target) in state.out:
+            if char_class == '$':
+                # $ matches at the end, so if we're at the end, this transition is valid
+                # Then check if target can reach accept via epsilon
+                reachable = epsilon_closure({target})
+                if nfa.accept in reachable:
+                    return True
+
+    return False
+
+
+# ==============================================================================
+# Public API
+# ==============================================================================
+
+def compile(pattern):
+    """
+    Compile a regex pattern string into an NFA object.
+
+    Args:
+        pattern: A regex pattern string.
+
+    Returns:
+        An NFA object that can be used with match().
+    """
+    parser = RegexParser(pattern)
+    nfa = parser.parse()
+    return nfa
+
+
+def match(re_obj, text):
+    """
+    Match a compiled regex (NFA) against a text string.
+
+    Args:
+        re_obj: An NFA object returned by compile().
+        text: The text string to match against.
+
+    Returns:
+        True if the regex matches the entire text, False otherwise.
+    """
+    return match_nfa(re_obj, text)
+
+
+# ==============================================================================
+# Test Cases
+# ==============================================================================
+
+if __name__ == "__main__":
+    def run_test(pattern, text, expected, description=""):
+        """Run a single test case."""
+        try:
+            nfa = compile(pattern)
+            result = match(nfa, text)
+            status = "PASS" if result == expected else "FAIL"
+            if status == "FAIL":
+                print(f"  {status}: Pattern='{pattern}', Text='{text}', Expected={expected}, Got={result}")
+            else:
+                print(f"  {status}: {description or f'Pattern={pattern}, Text={text}'}")
+            return status == "PASS"
+        except Exception as e:
+            print(f"  FAIL: Pattern='{pattern}', Text='{text}', Exception={e}")
+            return False
+
+    print("Running test cases...")
+    all_passed = True
+
+    # Test 1: Simple literal
+    all_passed &= run_test("abc", "abc", True, "Literal match")
+    all_passed &= run_test("abc", "abd", False, "Literal mismatch")
+
+    # Test 2: Dot (any character)
+    all_passed &= run_test("a.c", "abc", True, "Dot matches any character")
+    all_passed &= run_test("a.c", "aXc", True, "Dot matches any character 2")
+    all_passed &= run_test("a.c", "ac", False, "Dot requires exactly one character")
+
+    # Test 3: Star (*)
+    all_passed &= run_test("ab*c", "ac", True, "Star: zero occurrences")
+    all_passed &= run_test("ab*c", "abc", True, "Star: one occurrence")
+    all_passed &= run_test("ab*c", "abbc", True, "Star: multiple occurrences")
+    all_passed &= run_test("ab*c", "abbbc", True, "Star: many occurrences")
+
+    # Test 4: Plus (+)
+    all_passed &= run_test("ab+c", "abc", True, "Plus: one occurrence")
+    all_passed &= run_test("ab+c", "abbc", True, "Plus: multiple occurrences")
+    all_passed &= run_test("ab+c", "ac", False, "Plus: zero occurrences should fail")
+
+    # Test 5: Optional (?)
+    all_passed &= run_test("ab?c", "ac", True, "Optional: zero occurrences")
+    all_passed &= run_test("ab?c", "abc", True, "Optional: one occurrence")
+    all_passed &= run_test("ab?c", "abbc", False, "Optional: two occurrences should fail")
+
+    # Test 6: Alternation (|)
+    all_passed &= run_test("ab|cd", "ab", True, "Alternation: first option")
+    all_passed &= run_test("ab|cd", "cd", True, "Alternation: second option")
+    all_passed &= run_test("ab|cd", "ab", True, "Alternation: first option 2")
+    all_passed &= run_test("ab|cd", "ef", False, "Alternation: no match")
+
+    # Test 7: Parentheses
+    all_passed &= run_test("(ab)+", "ab", True, "Parentheses with plus")
+    all_passed &= run_test("(ab)+", "abab", True, "Parentheses with plus: multiple")
+    all_passed &= run_test("(ab)+", "", False, "Parentheses with plus: empty should fail")
+
+    # Test 8: Character class [...]
+    all_passed &= run_test("[abc]", "a", True, "Char class: single match")
+    all_passed &= run_test("[abc]", "b", True, "Char class: single match 2")
+    all_passed &= run_test("[abc]", "d", False, "Char class: no match")
+    all_passed &= run_test("[a-z]", "m", True, "Char class: range match")
+    all_passed &= run_test("[a-z]", "M", False, "Char class: range no match")
+
+    # Test 9: Negated character class [^...]
+    all_passed &= run_test("[^abc]", "d", True, "Negated char class: match")
+    all_passed &= run_test("[^abc]", "a", False, "Negated char class: no match")
+
+    # Test 10: Shorthand \d
+    all_passed &= run_test("\\d+", "123", True, "Shorthand \\d: digits")
+    all_passed &= run_test("\\d+", "abc", False, "Shorthand \\d: no digits")
+    all_passed &= run_test("\\d+", "12a3", False, "Shorthand \\d: mixed should fail")
+
+    # Test 11: Shorthand \w
+    all_passed &= run_test("\\w+", "abc123_", True, "Shorthand \\w: word chars")
+    all_passed &= run_test("\\w+", "abc 123", False, "Shorthand \\w: space should fail")
+
+    # Test 12: Shorthand \s
+    all_passed &= run_test("\\s+", "  \t\n", True, "Shorthand \\s: whitespace")
+    all_passed &= run_test("\\s+", "abc", False, "Shorthand \\s: no whitespace")
+
+    # Test 13: Anchors ^ and $
+    all_passed &= run_test("^abc", "abc", True, "Start anchor: match")
+    all_passed &= run_test("^abc", "xabc", False, "Start anchor: no match")
+    all_passed &= run_test("abc$", "abc", True, "End anchor: match")
+    all_passed &= run_test("abc$", "abcx", False, "End anchor: no match")
+    all_passed &= run_test("^abc$", "abc", True, "Both anchors: match")
+    all_passed &= run_test("^abc$", "xabc", False, "Both anchors: no match 1")
+    all_passed &= run_test("^abc$", "abcx", False, "Both anchors: no match 2")
+
+    # Test 14: Escaped metacharacters
+    all_passed &= run_test("\\.", ".", True, "Escaped dot: match")
+    all_passed &= run_test("\\.", "a", False, "Escaped dot: no match")
+    all_passed &= run_test("\\*", "*", True, "Escaped star: match")
+    all_passed &= run_test("\\+", "+", True, "Escaped plus: match")
+
+    # Test 15: Complex pattern
+    all_passed &= run_test("a(b|c)*d", "ad", True, "Complex: zero repetitions")
+    all_passed &= run_test("a(b|c)*d", "abd", True, "Complex: one b")
+    all_passed &= run_test("a(b|c)*d", "acd", True, "Complex: one c")
+    all_passed &= run_test("a(b|c)*d", "abcbd", True, "Complex: multiple")
+    all_passed &= run_test("a(b|c)*d", "abbd", True, "Complex: multiple b's")
+
+    print()
+    if all_passed:
+        print("All tests passed!")
+    else:
+        print("Some tests failed!")
+
+```

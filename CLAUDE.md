@@ -49,7 +49,7 @@ llm info                # System info (GPU, PCIe, engines)
 **When to use which model:**
 - Qwen3.6-35B-A3B: daily coding, chat, edits — ~102 t/s @ 262k ctx via Madreag turboquant. 3B active params makes it very fast.
 - Qwen3.6-27B + Madreag: hard one-shot coding tasks where quality matters — ~20 t/s but Sonnet 4.6-tier output (per Qwen). Same simple stack as 35B.
-- Qwen3.6-27B + vLLM + MTP: serious 27B throughput — ~54 t/s @ 262k via speculative decoding. More complex setup, see `scripts/setup-vllm-27b.sh`.
+- **Qwen3.6-27B + vLLM + Genesis** ⭐: best 27B throughput — **~67 t/s code / 46 t/s prose / 70 peak** decode_TPS (proper streaming bench, enable_thinking=false). Launch via `scripts/serve-27b-vllm-genesis.sh`. See [skills/qwen36-27b-vllm-genesis.md](skills/qwen36-27b-vllm-genesis.md). Bandwidth-bound at ~67 t/s; 80 t/s requires custom EAGLE-3 head (none published yet).
 
 ## Services (systemd, autostart on boot)
 
