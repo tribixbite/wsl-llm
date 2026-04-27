@@ -466,7 +466,83 @@ The `dev` recommendation is **mixed/balanced** since user prompts vary. Switch t
 
 ---
 
-## 11. References
+## 11. Sandermage Genesis vLLM patches + correct measurement methodology
+
+User asked us to test Sandermage Genesis + try every untested path. Got pointed at [`Sandermage/genesis-vllm-patches`](https://github.com/Sandermage/genesis-vllm-patches) (45+ patches, 19 stars, updated daily) plus [`noonghunna/qwen36-27b-single-3090`](https://github.com/noonghunna/qwen36-27b-single-3090) (recipe claiming 66/84 TPS narrative/code on 1× 3090 with the exact same Lorbus model we use).
+
+Artifacts: [bench/results/qwen36-27b/sandermage-genesis/](../bench/results/qwen36-27b/sandermage-genesis/).
+
+### 11a. Setup
+
+1. Mount `vllm/_genesis/` package into `~/bench_env/lib/python3.10/site-packages/vllm/`.
+2. `pip install -e ~/qwen36-noon/patches/genesis/genesis_vllm_plugin` to register Genesis as `vllm.general_plugins` entry-point — auto-loads in main API server **and engine subprocess** (essential).
+3. Verify with `python -c "from importlib.metadata import entry_points; print([e.name for e in entry_points(group='vllm.general_plugins')])"` → `['genesis_v7', ...]`.
+4. Launch with noonghunna's flags: `--max-model-len 20000`, `--max-num-batched-tokens 2048`, `--kv-cache-dtype fp8_e5m2`, `--gpu-memory-utilization 0.93`, etc.
+5. Set Genesis env opt-ins: `GENESIS_ENABLE_P75_SUFFIX_DECODING=1 P77_ADAPTIVE_NGRAM_K=1 P81_FP8_BLOCK_SCALED_M_LE_8=1 P79B/C/40=1`.
+
+Result: **21 of 58 Genesis patches active** in engine subprocess.
+
+### 11b. Critical measurement-methodology fix
+
+Earlier sections measured `wall_TPS = tokens / wall_time` with `chat_template_kwargs:{enable_thinking:False}` not always passed properly, causing the model to slip into reasoning mode and inflating wall time. noonghunna's `bench.sh` measures **`decode_TPS = tokens / (wall - TTFT)`** via streaming — and explicitly disables thinking. Re-running with their methodology bumped numbers ~25-30% on the same server.
+
+### 11c. Results (Genesis active, proper bench)
+
+3 warmups + 5 measured runs each. `decode_TPS` headline metric.
+
+| Prompt | Decode TPS | Wall TPS | Notes |
+|--------|-----------:|---------:|-------|
+| Transformer attention essay (canonical narrative) | 45.81 | 45.50 | Free-form prose |
+| BST + unit tests (real code) | **67.36** | 66.66 | Mixed code+structure |
+| **JSON integer sequence** ⭐ | **70.10** | 69.14 | Max MTP acceptance (~95%) |
+| Repetitive markdown table (100 rows) | 68.56 | 67.93 | Tabular structure |
+| Doubly linked list class | 61.13 | 60.56 | Standard library code |
+| TypeScript Express CRUD API | 54.57 | 54.04 | Boilerplate-heavy |
+| Fibonacci continuation | 46.98 | 46.70 | Pattern with reasoning |
+
+### 11d. Why we did not reproduce the "84 code TPS" claim
+
+| Cause | Detail |
+|-------|--------|
+| **27B Dense bandwidth ceiling** | 14 GB/token / 936 GB/s ≈ **67 t/s theoretical no-spec max**. We hit 67 on real code, 70 on max-acceptance prompts — at the ceiling already. |
+| **Most Genesis speed patches are MoE-only or TurboQuant-only** | P17/P18/P24/P31 = MoE; P3/P22/P26/P32/P33/P38/P40 = TurboQuant KV (we use fp8_e5m2). For 27B Dense + fp8 KV, only the generic patches fire. |
+| **No FP8 native compute on RTX 3090 (sm_86)** | Genesis P1/P2 fall back to Marlin INT4. |
+| **noonghunna's 84 code may use different prompt or vLLM build** | Their docker pin is specific (`vllm/vllm-openai@sha256:9bba4628...`); we run vLLM 0.17.0rc1.dev126 on bare metal. |
+
+Sandermage's own `MODELS.md` for Qwen3.6-27B Dense on 1× 3090 states:
+> Speed estimate: **~50-65 tok/s decode** (vs our 127 with MTP A3B)
+
+**Our 67 t/s real-code is at the upper bound of that range.** Sandermage does not claim 80 t/s for 27B Dense.
+
+### 11e. Updated production recommendation (final, all-engines all-configs)
+
+| Workload | Engine | Config | Decode TPS |
+|----------|--------|--------|-----------:|
+| Mixed prose + code | **vLLM + Genesis + MTP n=3 + fp8_e5m2 KV** ⭐ | noon recipe | **46-70** (prompt-dependent) |
+| Code-heavy | **SGLang + NEXTN n=5 chain** | from §10 | **42-64** |
+| Stability over speed | vLLM + MTP n=3 (no Genesis) | baseline | 30-55 |
+| llama.cpp-only stack | Madreag + IQ4_XS + turbo3 KV | from §3a | 25 |
+
+**vLLM + Genesis is the new production winner** for 27B Dense — beats SGLang on prose (46 vs 32) and ties or beats on code (67 vs 64).
+
+The earlier §10 conclusion ("64 t/s code ceiling") is now updated — proper methodology + Genesis pushes peak to **70 t/s on highly-predictable patterns**, average code workloads land in **55-67 t/s**, and prose lands in **45-50 t/s**.
+
+### 11f. The 80 t/s target — final verdict
+
+| Path | Status |
+|------|--------|
+| **Highly-repetitive content** (JSON sequences, generated tables) | ✅ **70 t/s achievable** with Genesis + MTP — within striking distance |
+| **Real coding workloads** (mixed code+text, agentic) | ❌ **55-67 t/s** is the realistic ceiling on this hardware |
+| **Free-form prose** (essays, articles) | ❌ **45-50 t/s** — bandwidth + prose-MTP-acceptance ceiling |
+
+**80 t/s on Qwen3.6-27B Dense + 1× RTX 3090** requires either:
+1. Train a custom **EAGLE-3 head** (~6h overnight via [SpecForge](https://github.com/sgl-project/SpecForge), expected 80-100 t/s based on EAGLE-3 typical 3-4× ratio vs MTP's 2×).
+2. **Hardware upgrade** (RTX 4090 = 1008 GB/s memory bandwidth → ~72 t/s no-spec → ~120 t/s with MTP; H100 → 200+ t/s easily).
+3. **Switch to 35B-A3B MoE** which already runs at ~102 t/s production daily driver in our stack — fundamentally lower bandwidth per token (3B active vs 27B all-active).
+
+---
+
+## 12. References
 
 ### Models
 - Qwen 3.6 27B official: https://github.com/QwenLM/Qwen3.6
