@@ -1,0 +1,62 @@
+To solve this problem, we need to determine the number of pairs $(i, j)$ such that $i < j$ and $b_i^{b_j} = b_j^{b_i}$, where $b_i = 2^{a_i}$ and $b_j = 2^{a_j}$. 
+
+### Approach
+1. **Problem Analysis**: The key observation is that $b_i^{b_j} = b_j^{b_i}$ translates to $(2^{a_i})^{2^{a_j}} = (2^{a_j})^{2^{a_i}}$. Simplifying this, we get $2^{a_i \cdot 2^{a_j}} = 2^{a_j \cdot 2^{a_i}}$, which implies $a_i \cdot 2^{a_j} = a_j \cdot 2^{a_i}$. 
+2. **Special Cases**:
+   - **Case 1**: When $a_i = a_j$, the equation holds trivially. Thus, any two indices with the same $a_i$ value form a valid pair.
+   - **Case 2**: The only other solution to the equation $a_i \cdot 2^{a_j} = a_j \cdot 2^{a_i}$ for distinct $a_i$ and $a_j$ is when one of the values is 1 and the other is 2. Specifically, if $a_i = 1$ and $a_j = 2$, then $1 \cdot 2^2 = 4$ and $2 \cdot 2^1 = 4$, so the equation holds. Similarly, if $a_i = 2$ and $a_j = 1$, it also holds.
+3. **Counting Pairs**:
+   - For each distinct value in the array $a$, count the frequency of each value.
+   - The number of pairs with the same value $x$ is given by $\binom{\text{count}[x]}{2} = \frac{\text{count}[x] \cdot (\text{count}[x] - 1)}{2}$.
+   - Additionally, pairs where one value is 1 and the other is 2 are also valid. The number of such pairs is $\text{count}[1] \cdot \text{count}[2]$.
+4. **Algorithm**:
+   - For each test case, read the array $a$.
+   - Count the frequencies of each element in $a$.
+   - Calculate the number of pairs with the same value.
+   - Add the number of pairs where one value is 1 and the other is 2.
+   - Output the total count of valid pairs.
+
+### Solution Code
+```python
+import sys
+from collections import Counter
+
+def main():
+    data = sys.stdin.read().split()
+    t = int(data[0])
+    index = 1
+    results = []
+    for _ in range(t):
+        n = int(data[index])
+        index += 1
+        a = list(map(int, data[index:index+n]))
+        index += n
+        
+        cnt = Counter(a)
+        total = 0
+        
+        for x in cnt:
+            c = cnt[x]
+            if c >= 2:
+                total += c * (c - 1) // 2
+                
+        if 1 in cnt and 2 in cnt:
+            total += cnt[1] * cnt[2]
+            
+        results.append(str(total))
+        
+    print('\n'.join(results))
+
+if __name__ == '__main__':
+    main()
+```
+
+### Explanation
+1. **Reading Input**: The input is read all at once for efficiency, especially given the constraints.
+2. **Processing Each Test Case**:
+   - For each test case, the array $a$ is processed to count the frequency of each element using a `Counter`.
+   - **Same Value Pairs**: For each distinct value $x$ in the array, the number of pairs $(i, j)$ with $i < j$ and $a_i = a_j = x$ is calculated as $\binom{\text{count}[x]}{2}$.
+   - **Special Pairs (1 and 2)**: The number of pairs where one element is 1 and the other is 2 is simply the product of their counts, $\text{count}[1] \cdot \text{count}[2]$.
+3. **Output**: The results for all test cases are collected and printed at the end.
+
+This approach efficiently counts the valid pairs by leveraging mathematical insights and frequency counting, ensuring optimal performance even for large inputs.

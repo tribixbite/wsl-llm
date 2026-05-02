@@ -1,0 +1,83 @@
+```python
+class Solution:
+    def count(self, num1: str, num2: str, min_sum: int, max_sum: int) -> int:
+        MOD = 10**9 + 7
+        
+        def count_up_to(s: str, min_s: int, max_s: int) -> int:
+            """
+            Count numbers x such that 0 <= x <= int(s) and min_s <= digit_sum(x) <= max_s.
+            """
+            n = len(s)
+            digits = [int(c) for c in s]
+            
+            # dp[i][tight][current_sum] = number of ways to fill positions i..n-1
+            # i: current position (0 to n)
+            # tight: whether we are still bounded by the prefix of s
+            # current_sum: sum of digits so far
+            
+            # We'll use memoization with a dictionary or a 3D array.
+            # Since n can be up to 22, current_sum up to 400, tight is 0 or 1.
+            # dp[i][tight][current_sum]
+            
+            # Initialize memoization table
+            # dp[i][tight][s] = count
+            # i from 0 to n, tight in {0,1}, s from 0 to max_s (we can cap at max_s since higher sums don't matter)
+            
+            # Use a 3D list: dp[i][tight][current_sum]
+            # But current_sum can go up to 9*22 = 198, but max_sum is up to 400. However, if current_sum > max_s, we can ignore.
+            # So we only track current_sum from 0 to max_s.
+            
+            # Let's do iterative DP or recursive with memo.
+            # Given constraints, recursive with memo is fine.
+            
+            from functools import lru_cache
+            
+            @lru_cache(maxsize=None)
+            def dp(i: int, tight: bool, current_sum: int) -> int:
+                if current_sum > max_s:
+                    return 0
+                if i == n:
+                    return 1 if min_s <= current_sum <= max_s else 0
+                
+                limit = digits[i] if tight else 9
+                total = 0
+                for d in range(0, limit + 1):
+                    new_tight = tight and (d == limit)
+                    total = (total + dp(i + 1, new_tight, current_sum + d)) % MOD
+                return total
+            
+            return dp(0, True, 0)
+        
+        # Count for num2: numbers from 0 to int(num2)
+        count2 = count_up_to(num2, min_sum, max_sum)
+        
+        # Count for num1: numbers from 0 to int(num1) - 1, i.e., up to num1 - 1
+        # We need to compute num1 - 1 as a string.
+        # Convert num1 to integer, subtract 1, convert back to string.
+        # But num1 can be up to 10^22, so we do it carefully.
+        
+        # Helper to subtract 1 from a numeric string
+        def subtract_one(s: str) -> str:
+            # s is a string of digits, no leading zeros (except "0" itself, but num1 >= 1)
+            n = len(s)
+            digits = list(s)
+            i = n - 1
+            while i >= 0:
+                if digits[i] > '0':
+                    digits[i] = str(int(digits[i]) - 1)
+                    break
+                else:
+                    digits[i] = '9'
+                    i -= 1
+            result = ''.join(digits)
+            # Remove leading zeros if any
+            result = result.lstrip('0')
+            if result == '':
+                return '0'
+            return result
+        
+        num1_minus_1 = subtract_one(num1)
+        count1 = count_up_to(num1_minus_1, min_sum, max_sum)
+        
+        return (count2 - count1 + MOD) % MOD
+```

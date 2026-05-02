@@ -1,0 +1,68 @@
+To solve this problem, we need to determine the minimum number of operations required to turn all black cells ('B') in a strip of paper into white cells ('W'). Each operation allows us to select any $k$ consecutive cells and turn them all white. The goal is to find the optimal way to cover all black cells with the fewest such operations.
+
+### Approach
+
+1. **Problem Analysis**: The key observation is that each operation can cover a segment of $k$ consecutive cells. To minimize the number of operations, we should greedily cover the leftmost uncovered black cell with an operation that starts at or before this cell and extends as far right as possible. This ensures that each operation covers the maximum number of subsequent black cells.
+
+2. **Greedy Strategy**: 
+   - Traverse the string from left to right.
+   - Whenever we encounter a black cell ('B') that has not been covered by a previous operation, we perform an operation starting at this cell. This operation will cover the next $k$ cells (from the current position to current position + $k - 1$).
+   - We then skip the next $k$ cells since they are now covered (turned white) by this operation.
+   - Continue this process until all black cells are covered.
+
+3. **Algorithm**:
+   - Initialize a counter for the number of operations.
+   - Use a pointer to traverse the string.
+   - For each black cell encountered, increment the operation counter and move the pointer forward by $k$ positions (since the next $k$ cells are covered).
+   - If a white cell is encountered, simply move to the next cell.
+
+### Solution Code
+
+```python
+import sys
+
+def solve():
+    input = sys.stdin.read
+    data = input().split()
+    t = int(data[0])
+    index = 1
+    results = []
+    
+    for _ in range(t):
+        n = int(data[index])
+        k = int(data[index+1])
+        index += 2
+        s = data[index]
+        index += 1
+        
+        operations = 0
+        i = 0
+        while i < n:
+            if s[i] == 'B':
+                operations += 1
+                i += k  # Skip the next k cells as they are covered by this operation
+            else:
+                i += 1
+        
+        results.append(str(operations))
+    
+    print('\n'.join(results))
+
+if __name__ == '__main__':
+    solve()
+```
+
+### Explanation
+
+1. **Reading Input**: The input is read all at once for efficiency, especially given the constraints. The first value is the number of test cases $t$.
+2. **Processing Each Test Case**:
+   - For each test case, we read $n$ (length of the string) and $k$ (length of the segment that can be turned white in one operation).
+   - We then read the string $s$ which represents the strip of paper.
+3. **Greedy Coverage**:
+   - We initialize a counter `operations` to zero and a pointer `i` to traverse the string.
+   - As we iterate through the string:
+     - If we encounter a black cell ('B'), we increment the `operations` counter and move the pointer forward by $k$ positions. This simulates performing an operation that covers the current black cell and the next $k-1$ cells.
+     - If we encounter a white cell ('W'), we simply move to the next cell.
+4. **Output**: After processing all test cases, the results are printed, each on a new line.
+
+This approach efficiently covers all black cells with the minimum number of operations by always extending the coverage as much as possible to the right, leveraging the greedy strategy. The time complexity is $O(n)$ per test case, which is optimal given the constraints.

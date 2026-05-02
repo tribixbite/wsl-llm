@@ -1,0 +1,104 @@
+To solve this problem, we need to determine the winner of a game played by Vanya and Vova based on the initial integer \( n \). The game involves players taking turns to either add 1 or subtract 1 from the current integer. Vanya starts first, and if after his move the integer becomes divisible by 3, he wins. If 10 moves have passed and Vanya has not won, Vova wins. Both players play optimally.
+
+### Approach
+1. **Problem Analysis**:
+   - Vanya wins if after his move, the number is divisible by 3.
+   - Vova wins if after 10 moves (5 moves each), Vanya has not won.
+   - Since both players play optimally, we can use game theory concepts to determine the winner. Specifically, we can model the game as a finite impartial game and use backward induction (or minimax algorithm) to determine the optimal moves.
+
+2. **Key Insight**:
+   - The game is finite and deterministic. We can simulate the game for up to 10 moves (5 rounds for each player) and check all possible moves.
+   - For each state (current number and move count), we can determine if the current player can force a win.
+   - Vanya wins if he can make a move such that the resulting number is divisible by 3.
+   - Vova will try to prevent Vanya from achieving this within 10 moves.
+
+3. **Algorithm Selection**:
+   - Use recursion with memoization to explore all possible moves up to 10 moves.
+   - For each test case, start with the initial number \( n \) and simulate the game for up to 10 moves.
+   - If at any point Vanya can make a move that results in a number divisible by 3, he wins.
+   - If after 10 moves Vanya has not won, Vova wins.
+
+4. **Optimization**:
+   - Since the number of moves is small (up to 10), we can use a simple recursive approach with memoization to avoid redundant calculations.
+   - The state can be represented by the current number and the move count.
+
+### Solution Code
+```python
+import sys
+
+def solve():
+    input = sys.stdin.read().split()
+    t = int(input[0])
+    results = []
+    index = 1
+    for _ in range(t):
+        n = int(input[index])
+        index += 1
+        # We'll use a memoization dictionary to store results for states (current_n, move_count)
+        # move_count: 0 to 10. Vanya moves on even moves (0,2,4,6,8), Vova on odd moves (1,3,5,7,9)
+        # But note: the problem says "if after Vanya's move the integer is divisible by 3, then he wins"
+        # So after Vanya's move (which is move 1, 3, 5, 7, 9 in 1-indexed? Let's clarify:
+        # Move 1: Vanya moves. Then check if divisible by 3 -> Vanya wins.
+        # Move 2: Vova moves.
+        # Move 3: Vanya moves. Then check if divisible by 3 -> Vanya wins.
+        # ...
+        # Up to move 10: Vova moves. Then if Vanya hasn't won, Vova wins.
+        
+        # Let's define the state as (current_n, move_number) where move_number goes from 1 to 10.
+        # But note: the check for Vanya winning happens immediately after his move.
+        # So after move 1 (Vanya), we check. After move 3 (Vanya), we check, etc.
+        
+        # We can use a recursive function with memoization.
+        memo = {}
+        
+        def can_vanya_win(current_n, move):
+            # move: 1 to 10
+            if move > 10:
+                return False  # Vova wins because 10 moves passed and Vanya didn't win
+            
+            state = (current_n, move)
+            if state in memo:
+                return memo[state]
+            
+            if move % 2 == 1:  # Vanya's move
+                # Vanya can choose to add 1 or subtract 1
+                for nxt in [current_n + 1, current_n - 1]:
+                    if nxt % 3 == 0:
+                        memo[state] = True
+                        return True
+                    # Otherwise, we continue to the next move
+                    if can_vanya_win(nxt, move + 1):
+                        memo[state] = True
+                        return True
+                memo[state] = False
+                return False
+            else:  # Vova's move
+                # Vova will try to prevent Vanya from winning. So Vova wins if there exists a move such that Vanya cannot win from the resulting state.
+                for nxt in [current_n + 1, current_n - 1]:
+                    if not can_vanya_win(nxt, move + 1):
+                        memo[state] = False
+                        return False
+                memo[state] = True
+                return True
+        
+        if can_vanya_win(n, 1):
+            results.append("First")
+        else:
+            results.append("Second")
+    
+    for res in results:
+        print(res)
+
+solve()
+```
+
+### Explanation
+1. **Reading Input**: The input is read all at once for efficiency, especially given the constraints.
+2. **Memoization**: A dictionary `memo` is used to store the results of subproblems to avoid redundant calculations.
+3. **Recursive Function `can_vanya_win`**:
+   - **Base Case**: If more than 10 moves have been made, Vova wins (return `False`).
+   - **Vanya's Turn (odd moves)**: Vanya checks if either of his moves (add 1 or subtract 1) results in a number divisible by 3. If yes, he wins. Otherwise, he checks if any of his moves lead to a state where he can eventually win.
+   - **Vova's Turn (even moves)**: Vova tries to prevent Vanya from winning. If any of Vova's moves lead to a state where Vanya cannot win, Vova wins (return `False`). Otherwise, Vanya wins (return `True`).
+4. **Output**: For each test case, the result is stored in a list and printed at the end.
+
+This approach efficiently determines the winner by exploring all possible moves up to 10 moves using recursion with memoization, ensuring optimal play from both players.

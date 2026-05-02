@@ -1,0 +1,22 @@
+```python
+class Solution:
+    def semiOrderedPermutation(self, nums: List[int]) -> int:
+        n = len(nums)
+        # Find the index of 1 and the index of n
+        idx1 = nums.index(1)
+        idxn = nums.index(n)
+        
+        # To move 1 to the front (index 0), we need idx1 swaps.
+        # To move n to the end (index n-1), we need (n - 1 - idxn) swaps.
+        # However, if idx1 > idxn, then when we move 1 to the front, it passes through n's original position,
+        # effectively shifting n one position to the right. So we save one swap.
+        
+        moves = idx1 + (n - 1 - idxn)
+        
+        # If 1 is to the right of n, then moving 1 leftwards will shift n one step to the right,
+        # so we subtract 1 because that one swap helps both.
+        if idx1 > idxn:
+            moves -= 1
+            
+        return moves
+```

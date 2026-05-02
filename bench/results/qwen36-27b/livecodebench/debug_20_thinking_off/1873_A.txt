@@ -1,0 +1,45 @@
+```python
+import sys
+
+def solve():
+    input = sys.stdin.read().split()
+    if not input:
+        return
+    t = int(input[0])
+    results = []
+    for i in range(1, t + 1):
+        s = input[i]
+        if s == "abc":
+            results.append("YES")
+        else:
+            # Check if we can get "abc" by swapping exactly two characters
+            # The target is "abc"
+            # We can try all possible swaps (3 choose 2 = 3 swaps)
+            found = False
+            # Swap indices 0 and 1
+            s1 = list(s)
+            s1[0], s1[1] = s1[1], s1[0]
+            if ''.join(s1) == "abc":
+                found = True
+            # Swap indices 0 and 2
+            s2 = list(s)
+            s2[0], s2[2] = s2[2], s2[0]
+            if ''.join(s2) == "abc":
+                found = True
+            # Swap indices 1 and 2
+            s3 = list(s)
+            s3[1], s3[2] = s3[2], s3[1]
+            if ''.join(s3) == "abc":
+                found = True
+            
+            if found:
+                results.append("YES")
+            else:
+                results.append("NO")
+    
+    for res in results:
+        print(res)
+
+if __name__ == '__main__':
+    solve()
+```

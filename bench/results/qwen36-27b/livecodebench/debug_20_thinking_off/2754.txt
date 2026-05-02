@@ -1,0 +1,68 @@
+```python
+class Solution:
+    def maxStrength(self, nums: List[int]) -> int:
+        n = len(nums)
+        if n == 1:
+            return nums[0]
+        
+        # We need to choose a non-empty subset of indices to maximize the product.
+        # Since n is small (<=13), we could do brute force, but let's think logically.
+        
+        # Separate positives, negatives, and zeros.
+        positives = [x for x in nums if x > 0]
+        negatives = [x for x in nums if x < 0]
+        zeros = [x for x in nums if x == 0]
+        
+        # If there are no positives and no negatives (only zeros), then max strength is 0.
+        # If there are negatives but no positives:
+        #   We want to take an even number of negatives (to make product positive).
+        #   If number of negatives is even, take all.
+        #   If odd, take all but the one with smallest absolute value (i.e., the largest negative, closest to 0).
+        # If there are positives, we always take all positives.
+        # For negatives, same logic: take even count. If odd, drop the one with largest value (closest to 0).
+        
+        # But we must have a non-empty group.
+        
+        # Let's handle cases:
+        
+        # Case 1: no positives and no negatives -> only zeros -> return 0
+        if not positives and not negatives:
+            return 0
+        
+        # Start with product of all positives
+        product = 1
+        for x in positives:
+            product *= x
+        
+        # Sort negatives in ascending order (most negative first)
+        negatives.sort()
+        
+        # If number of negatives is even, multiply all
+        # If odd, skip the last one (which is the largest, i.e., closest to 0, so smallest absolute value)
+        if len(negatives) % 2 == 0:
+            for x in negatives:
+                product *= x
+        else:
+            # Skip the last negative (largest, closest to 0)
+            for x in negatives[:-1]:
+                product *= x
+        
+        # But what if after this, we have no elements selected?
+        # This can happen if positives is empty and negatives has only 1 element.
+        # In that case, we skipped the only negative, so product is still 1 but we selected nothing.
+        # We need to ensure non-empty group.
+        
+        # Check if we selected any element from positives or negatives.
+        selected_count = len(positives) + (len(negatives) if len(negatives) % 2 == 0 else len(negatives) - 1)
+        
+        if selected_count == 0:
+            # This means no positives and either 0 or 1 negative.
+            # If 0 negatives, then only zeros exist -> return 0 (handled above, but let's be safe)
+            # If 1 negative, we must take that negative.
+            if negatives:
+                return negatives[0]
+            else:
+                return 0
+        
+        return product
+```

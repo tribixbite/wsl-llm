@@ -1,0 +1,61 @@
+To solve this problem, we need to find the maximum sum of a non-empty subarray where adjacent elements have alternating parities. This means that for any two consecutive elements in the subarray, one must be even and the other must be odd.
+
+### Approach
+1. **Problem Analysis**: The problem requires us to find a contiguous subarray such that no two adjacent elements in the subarray have the same parity. The goal is to maximize the sum of such a subarray.
+2. **Key Insight**: We can traverse the array and maintain a running sum of the current valid subarray. If the current element and the previous element have different parities, we can extend the current subarray by including the current element. If they have the same parity, the current subarray must end, and we start a new subarray from the current element.
+3. **Algorithm Selection**: 
+   - Initialize the maximum sum to the smallest possible value (or the first element) and the current sum to the first element.
+   - Iterate through the array starting from the second element.
+   - For each element, check if its parity is different from the previous element. If yes, add it to the current sum. If not, update the maximum sum if the current sum is greater, and reset the current sum to the current element.
+   - After the loop, update the maximum sum one last time to account for the last subarray.
+4. **Complexity Analysis**: The algorithm processes each element of the array exactly once, leading to a time complexity of \(O(n)\) per test case, where \(n\) is the length of the array. Given the constraints, this approach is efficient.
+
+### Solution Code
+```python
+import sys
+
+def main():
+    data = sys.stdin.read().split()
+    t = int(data[0])
+    index = 1
+    results = []
+    for _ in range(t):
+        n = int(data[index])
+        index += 1
+        a = list(map(int, data[index:index+n]))
+        index += n
+        
+        if n == 0:
+            results.append("0")
+            continue
+            
+        max_sum = a[0]
+        current_sum = a[0]
+        
+        for i in range(1, n):
+            if (a[i] % 2) != (a[i-1] % 2):
+                current_sum += a[i]
+            else:
+                if current_sum > max_sum:
+                    max_sum = current_sum
+                current_sum = a[i]
+                
+        if current_sum > max_sum:
+            max_sum = current_sum
+            
+        results.append(str(max_sum))
+        
+    print("\n".join(results))
+
+if __name__ == "__main__":
+    main()
+```
+
+### Explanation
+1. **Reading Input**: The input is read all at once for efficiency, especially given the constraints.
+2. **Processing Each Test Case**: For each test case, we initialize `max_sum` and `current_sum` to the first element of the array.
+3. **Traversing the Array**: Starting from the second element, we check if the current element's parity is different from the previous element's. If it is, we add the current element to `current_sum`. If not, we compare `current_sum` with `max_sum` and update `max_sum` if necessary, then reset `current_sum` to the current element.
+4. **Final Check**: After the loop, we perform a final check to ensure the last subarray's sum is considered for `max_sum`.
+5. **Output**: The results for all test cases are collected and printed at the end.
+
+This approach efficiently computes the maximum sum of a subarray with alternating parities by leveraging a single pass through the array, ensuring optimal performance.

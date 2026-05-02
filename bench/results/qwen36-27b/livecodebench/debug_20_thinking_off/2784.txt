@@ -1,0 +1,73 @@
+```python
+class Solution:
+    def sumOfPower(self, nums: List[int]) -> int:
+        MOD = 10**9 + 7
+        nums.sort()
+        n = len(nums)
+        total = 0
+        # We maintain a running sum of contributions from previous elements.
+        # For each element nums[i], when it is the maximum in a group,
+        # the group must include nums[i] and any subset of elements from indices < i.
+        # The minimum of the group will be the smallest element in that subset (or nums[i] if the subset is empty).
+        #
+        # Let's define dp as the sum of min(group) for all non-empty groups formed from nums[0..i-1]
+        # where each group is considered in the context that we will add nums[i] as the new maximum.
+        #
+        # Actually, a better approach:
+        # Sort the array. For each i, consider nums[i] as the maximum.
+        # Any group that has nums[i] as the maximum must consist of nums[i] and any subset of {nums[0], ..., nums[i-1]}.
+        # For such a group, the minimum is the minimum of the chosen subset (if the subset is non-empty) or nums[i] (if the subset is empty).
+        #
+        # Let S be the sum over all subsets of {nums[0], ..., nums[i-1]} of the minimum of the subset (with the convention that the min of an empty set is not considered here, but we handle the singleton {nums[i]} separately).
+        #
+        # Alternatively, we can use a dynamic programming approach:
+        # Let f(i) be the sum of min(group) for all groups formed from nums[0..i] that include nums[i] as the maximum? Not exactly.
+        #
+        # Standard solution for this problem:
+        # Sort nums.
+        # Let dp = 0. This will represent the sum of min values for all groups ending at the current position (with the current element being the max).
+        # For each i from 0 to n-1:
+        #   The groups where nums[i] is the max are: {nums[i]} union any subset of {nums[0],...,nums[i-1]}.
+        #   For the subset being empty: the group is {nums[i]}, min = nums[i], contribution = nums[i]^2 * nums[i] = nums[i]^3.
+        #   For non-empty subsets: let the subset be S. The min of the group is min(S). 
+        #   So the contribution is nums[i]^2 * min(S).
+        #   Sum over all non-empty subsets S of {nums[0],...,nums[i-1]} of min(S) is exactly what we can maintain.
+        #
+        # Let sum_min be the sum of min(S) for all non-empty subsets S of {nums[0],...,nums[i-1]}.
+        # Then when we move to i, the new sum_min' for {nums[0],...,nums[i]} can be computed.
+        # But note: we don't need sum_min for all subsets of the entire prefix, but rather we need to accumulate the answer.
+        #
+        # Insight: 
+        # Let dp[i] = sum of min(S) for all non-empty subsets S of {nums[0], ..., nums[i]}.
+        # When we add nums[i], the new subsets are:
+        #   - All old subsets (from {nums[0],...,nums[i-1]}), their min doesn't change.
+        #   - New subsets that include nums[i]. For each old subset S (including empty), the new subset is S U {nums[i]}.
+        #     The min of S U {nums[i]} is min(min(S), nums[i]). Since nums is sorted, nums[i] >= all previous, so min(S U {nums[i]}) = min(S) if S is non-empty, and nums[i] if S is empty.
+        #     So for non-empty S, the min is the same as min(S). There are 2^i such subsets (all non-empty subsets of the first i elements).
+        #     For the empty S, the new subset is {nums[i]}, min = nums[i].
+        #   Therefore: dp[i] = dp[i-1] + dp[i-1] + nums[i] = 2 * dp[i-1] + nums[i].
+        #   With dp[-1] = 0 (base case).
+        #
+        # Now, for each i, the total contribution to the answer from groups where nums[i] is the maximum is:
+        #   nums[i]^2 * (sum of min(S) for all subsets S of {nums[0],...,nums[i-1]} including the empty set treated as having min = nums[i] for the purpose of the group {nums[i]} U S)
+        #   But wait: for the group {nums[i]} U S, the min is:
+        #       if S is empty: min = nums[i]
+        #       if S is non-empty: min = min(S) [since nums[i] is the largest]
+        #   So the sum of min for all groups with max = nums[i] is: nums[i] + dp[i-1]
+        #   Therefore, contribution = nums[i]^2 * (nums[i] + dp[i-1])
+        #
+        # And then we update dp[i] = 2 * dp[i-1] + nums[i] for the next iteration.
+        
+        dp = 0  # This represents dp[i-1] at the start of iteration i
+        ans = 0
+        for x in nums:
+            # Contribution of groups where x is the maximum
+            # sum of min for these groups = x (for the group {x}) + dp (for all groups formed by x and a non-empty subset of previous)
+            total_min = (x + dp) % MOD
+            contrib = (x * x) % MOD * total_min % MOD
+            ans = (ans + contrib) % MOD
+            # Update dp for next iteration: dp_new = 2 * dp_old + x
+            dp = (2 * dp + x) % MOD
+        
+        return ans
+```

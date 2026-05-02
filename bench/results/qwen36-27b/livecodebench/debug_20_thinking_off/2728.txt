@@ -1,0 +1,22 @@
+```python
+class Solution:
+    def matrixSum(self, nums: List[List[int]]) -> int:
+        # Sort each row in descending order so that we can pick the largest elements in order
+        for row in nums:
+            row.sort(reverse=True)
+        
+        score = 0
+        # The number of columns (all rows have the same length per problem structure)
+        num_cols = len(nums[0])
+        
+        # For each column index (which corresponds to the k-th largest element in each row)
+        for j in range(num_cols):
+            # Find the maximum among the j-th elements of all rows
+            max_in_col = 0
+            for i in range(len(nums)):
+                if nums[i][j] > max_in_col:
+                    max_in_col = nums[i][j]
+            score += max_in_col
+        
+        return score
+```

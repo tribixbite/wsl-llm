@@ -1,0 +1,202 @@
+{
+  "thinking": false,
+  "max_tokens": 4096,
+  "n": 20,
+  "passed": 7,
+  "per_difficulty": {
+    "easy": [
+      4,
+      8
+    ],
+    "medium": [
+      1,
+      7
+    ],
+    "hard": [
+      2,
+      5
+    ]
+  },
+  "results": [
+    {
+      "problem_id": "1873_A",
+      "difficulty": "easy",
+      "pass": true,
+      "status": "PASS",
+      "tokens": 358,
+      "code_len": 1171,
+      "elapsed": 16.803695917129517
+    },
+    {
+      "problem_id": "1873_B",
+      "difficulty": "easy",
+      "pass": true,
+      "status": "PASS",
+      "tokens": 359,
+      "code_len": 1260,
+      "elapsed": 5.828824996948242
+    },
+    {
+      "problem_id": "1873_D",
+      "difficulty": "easy",
+      "pass": true,
+      "status": "PASS",
+      "tokens": 826,
+      "code_len": 658,
+      "elapsed": 13.284870147705078
+    },
+    {
+      "problem_id": "1883_B",
+      "difficulty": "medium",
+      "pass": false,
+      "status": "FAIL",
+      "tokens": 4096,
+      "code_len": 13602,
+      "elapsed": 66.82828044891357
+    },
+    {
+      "problem_id": "1883_C",
+      "difficulty": "medium",
+      "pass": true,
+      "status": "PASS",
+      "tokens": 1371,
+      "code_len": 2302,
+      "elapsed": 21.0073025226593
+    },
+    {
+      "problem_id": "1899_A",
+      "difficulty": "easy",
+      "pass": true,
+      "status": "PASS",
+      "tokens": 1457,
+      "code_len": 2697,
+      "elapsed": 23.263468980789185
+    },
+    {
+      "problem_id": "1899_B",
+      "difficulty": "hard",
+      "pass": true,
+      "status": "PASS",
+      "tokens": 1269,
+      "code_len": 1596,
+      "elapsed": 20.772355794906616
+    },
+    {
+      "problem_id": "1899_C",
+      "difficulty": "hard",
+      "pass": false,
+      "status": "FAIL",
+      "tokens": 809,
+      "code_len": 861,
+      "elapsed": 12.441277742385864
+    },
+    {
+      "problem_id": "1899_D",
+      "difficulty": "hard",
+      "pass": true,
+      "status": "PASS",
+      "tokens": 993,
+      "code_len": 666,
+      "elapsed": 15.229608297348022
+    },
+    {
+      "problem_id": "2727",
+      "difficulty": "easy",
+      "pass": false,
+      "status": "FAIL",
+      "tokens": 97,
+      "code_len": 313,
+      "elapsed": 1.8604013919830322
+    },
+    {
+      "problem_id": "2728",
+      "difficulty": "medium",
+      "pass": false,
+      "status": "FAIL",
+      "tokens": 189,
+      "code_len": 787,
+      "elapsed": 3.244703531265259
+    },
+    {
+      "problem_id": "2730",
+      "difficulty": "medium",
+      "pass": false,
+      "status": "FAIL",
+      "tokens": 323,
+      "code_len": 950,
+      "elapsed": 5.056793928146362
+    },
+    {
+      "problem_id": "2754",
+      "difficulty": "medium",
+      "pass": false,
+      "status": "FAIL",
+      "tokens": 704,
+      "code_len": 2860,
+      "elapsed": 12.042019367218018
+    },
+    {
+      "problem_id": "2755",
+      "difficulty": "medium",
+      "pass": false,
+      "status": "FAIL",
+      "tokens": 216,
+      "code_len": 719,
+      "elapsed": 3.36716890335083
+    },
+    {
+      "problem_id": "2756",
+      "difficulty": "easy",
+      "pass": false,
+      "status": "FAIL",
+      "tokens": 127,
+      "code_len": 463,
+      "elapsed": 2.156085252761841
+    },
+    {
+      "problem_id": "2757",
+      "difficulty": "hard",
+      "pass": false,
+      "status": "FAIL",
+      "tokens": 917,
+      "code_len": 3378,
+      "elapsed": 15.15986156463623
+    },
+    {
+      "problem_id": "2777",
+      "difficulty": "easy",
+      "pass": false,
+      "status": "FAIL",
+      "tokens": 98,
+      "code_len": 388,
+      "elapsed": 2.0742762088775635
+    },
+    {
+      "problem_id": "2779",
+      "difficulty": "medium",
+      "pass": false,
+      "status": "FAIL",
+      "tokens": 278,
+      "code_len": 1170,
+      "elapsed": 4.504822492599487
+    },
+    {
+      "problem_id": "2784",
+      "difficulty": "hard",
+      "pass": false,
+      "status": "FAIL",
+      "tokens": 1379,
+      "code_len": 4858,
+      "elapsed": 24.183581352233887
+    },
+    {
+      "problem_id": "2785",
+      "difficulty": "easy",
+      "pass": false,
+      "status": "FAIL",
+      "tokens": 244,
+      "code_len": 839,
+      "elapsed": 4.462349891662598
+    }
+  ]
+}

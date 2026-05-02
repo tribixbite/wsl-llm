@@ -1,0 +1,93 @@
+To solve this problem, we need to determine the maximum absolute difference between the total weights of any two trucks for all valid values of $k$, where $k$ is the number of boxes each truck can hold. The boxes are arranged in a row, and the first $k$ boxes go to the first truck, the next $k$ boxes to the second truck, and so on. The value of $k$ must be a divisor of $n$ (the total number of boxes) to ensure that all boxes are evenly distributed among the trucks.
+
+### Approach
+1. **Problem Analysis**: 
+   - For each test case, we are given $n$ boxes with weights $a_1, a_2, \dots, a_n$.
+   - We need to consider all divisors $k$ of $n$. For each $k$, the boxes are divided into $n/k$ trucks, each containing $k$ consecutive boxes.
+   - For each valid $k$, we calculate the total weight of each truck. The goal is to find the maximum difference between the maximum and minimum total weights of these trucks.
+   - The answer for each test case is the maximum such difference over all valid $k$.
+
+2. **Key Insight**:
+   - Instead of recalculating the sum of each truck for every divisor $k$ from scratch (which would be inefficient), we can precompute the prefix sums of the box weights. This allows us to compute the sum of any segment of boxes in constant time.
+   - For each divisor $k$ of $n$, we can iterate through the trucks (each of size $k$) and compute their total weights using the prefix sums. Then, we find the maximum and minimum total weights among these trucks and compute their difference.
+
+3. **Algorithm Selection**:
+   - **Prefix Sum Array**: Precompute an array where each element at index $i$ represents the sum of the first $i$ boxes. This helps in quickly calculating the sum of any segment of boxes.
+   - **Divisors Handling**: For each test case, find all divisors of $n$. For each divisor $k$, compute the total weights of the trucks and determine the maximum difference between the heaviest and lightest trucks.
+   - **Efficiency**: Since the sum of $n$ over all test cases is bounded by $150,000$, and the number of divisors for any $n$ is relatively small, this approach is efficient enough.
+
+4. **Complexity Analysis**:
+   - **Prefix Sum Computation**: $O(n)$ per test case.
+   - **Finding Divisors**: $O(\sqrt{n})$ per test case.
+   - **Processing Each Divisor**: For each divisor $k$, we process $n/k$ trucks. The total work across all divisors is bounded by $O(n \cdot d(n))$, where $d(n)$ is the number of divisors of $n$. Given the constraints, this is acceptable.
+
+### Solution Code
+```python
+import sys
+
+def main():
+    data = sys.stdin.read().split()
+    t = int(data[0])
+    index = 1
+    results = []
+    
+    for _ in range(t):
+        n = int(data[index])
+        index += 1
+        a = list(map(int, data[index:index+n]))
+        index += n
+        
+        if n == 1:
+            results.append("0")
+            continue
+            
+        prefix = [0] * (n + 1)
+        for i in range(1, n + 1):
+            prefix[i] = prefix[i-1] + a[i-1]
+            
+        max_diff = 0
+        
+        divisors = []
+        for k in range(1, int(n**0.5) + 1):
+            if n % k == 0:
+                divisors.append(k)
+                if k != 1 and k * k != n:
+                    divisors.append(n // k)
+                    
+        for k in divisors:
+            num_trucks = n // k
+            if num_trucks == 1:
+                current_diff = 0
+            else:
+                min_sum = float('inf')
+                max_sum = float('-inf')
+                for i in range(num_trucks):
+                    start_index = i * k
+                    end_index = start_index + k
+                    total = prefix[end_index] - prefix[start_index]
+                    if total < min_sum:
+                        min_sum = total
+                    if total > max_sum:
+                        max_sum = total
+                current_diff = max_sum - min_sum
+                
+            if current_diff > max_diff:
+                max_diff = current_diff
+                
+        results.append(str(max_diff))
+        
+    print("\n".join(results))
+
+if __name__ == "__main__":
+    main()
+```
+
+### Explanation
+1. **Reading Input**: The input is read all at once for efficiency, especially given the constraints.
+2. **Prefix Sum Array**: For each test case, we compute a prefix sum array to allow $O(1)$ computation of the sum of any segment of boxes.
+3. **Finding Divisors**: We find all divisors of $n$ by iterating up to $\sqrt{n}$. Each divisor $k$ represents a valid number of boxes per truck.
+4. **Calculating Truck Weights**: For each divisor $k$, we compute the total weight of each truck (segment of $k$ boxes) using the prefix sum array. We track the minimum and maximum total weights among all trucks for that $k$.
+5. **Maximum Difference**: The difference between the maximum and minimum truck weights for each $k$ is compared to find the overall maximum difference across all valid $k$.
+6. **Output**: The results for all test cases are collected and printed at the end.
+
+This approach efficiently handles the constraints by leveraging prefix sums and divisor properties, ensuring optimal performance even for large inputs.

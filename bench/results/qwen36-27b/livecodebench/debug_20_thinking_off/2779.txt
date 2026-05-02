@@ -1,0 +1,31 @@
+```python
+class Solution:
+    def colorTheArray(self, n: int, queries: List[int]) -> List[int]:
+        nums = [0] * n
+        answer = []
+        same_color_count = 0
+        
+        for index, color in queries:
+            # Before updating, check if the current index had same color with neighbors
+            # Check left neighbor
+            if index > 0 and nums[index] != 0 and nums[index] == nums[index - 1]:
+                same_color_count -= 1
+            # Check right neighbor
+            if index < n - 1 and nums[index] != 0 and nums[index] == nums[index + 1]:
+                same_color_count -= 1
+            
+            # Update the color
+            nums[index] = color
+            
+            # After updating, check if the new color matches with neighbors
+            # Check left neighbor
+            if index > 0 and nums[index] != 0 and nums[index] == nums[index - 1]:
+                same_color_count += 1
+            # Check right neighbor
+            if index < n - 1 and nums[index] != 0 and nums[index] == nums[index + 1]:
+                same_color_count += 1
+            
+            answer.append(same_color_count)
+        
+        return answer
+```

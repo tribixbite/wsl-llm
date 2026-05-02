@@ -1,0 +1,23 @@
+```python
+class Solution:
+    def minExtraChar(self, s: str, dictionary: List[str]) -> int:
+        n = len(s)
+        dict_set = set(dictionary)
+        
+        # dp[i] = minimum extra characters in s[i:]
+        dp = [0] * (n + 1)
+        dp[n] = 0  # base case: no characters left
+        
+        # Fill dp from right to left
+        for i in range(n - 1, -1, -1):
+            # Option 1: treat s[i] as an extra character
+            dp[i] = 1 + dp[i + 1]
+            
+            # Option 2: try to match a word starting at s[i]
+            for j in range(i + 1, n + 1):
+                substring = s[i:j]
+                if substring in dict_set:
+                    dp[i] = min(dp[i], dp[j])
+        
+        return dp[0]
+```
