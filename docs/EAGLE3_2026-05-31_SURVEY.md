@@ -77,11 +77,44 @@ Re-investigation after ~4-week gap. The world moved a lot.
 | **ExL3 + DFlash single-GPU with tighter drafter quant** | 2.50 bpw drafter = ~10 GB? + 16 GB target = fits | Lower acceptance but might still hit 80+ |
 | **Sandermage Genesis v7.72.x** + Streaming-GDN | Lower priority — solves ctx not speed | n/a for our 32k workload |
 
-## Recommendation for next session
+## UPDATE 2026-06-01 — DFlash (Luce fork) tested; plan re-prioritized
 
-1. **Test vLLM 0.22 in a fresh venv with EAGLE-3 + PRISM-EAGLE3-full** — highest expected gain (130 t/s) with cleanest path
-2. **Try ExL3 + DFlash 2.50bpw** to see if smaller drafter fits + speeds things up
-3. If user can free GPU 1 briefly, **ExL3 + DFlash 4.00bpw TP=2** is the published 177 t/s path
+A research pass corrected the April assumptions:
+
+- **The April DFlash "dead end" was a wrong-fork artifact** — it used
+  `spiritbuun/buun-llama-cpp` (broken hybrid tree kernels). The purpose-built
+  **`Luce-Org/lucebox-hub`** fork has custom GatedDeltaNet tree CUDA kernels and
+  documents 3.43× / 129 t/s on a single 3090.
+- **Built + benched it.** See `bench/results/qwen36-27b/dflash-luce/README.md`.
+  DFlash accelerates **only under greedy (temp=0)**: code 58 t/s greedy, but
+  **accept=0 / 19 t/s at temp=0.6** (DDTree verify is argmax-only; no Leviathan
+  tree rejection sampling yet — their README L459/469). Greedy 58 t/s code is
+  still **below** vLLM+Genesis+MTP production (67 t/s code at temp=0.6).
+  **Not a production upgrade until tree rejection sampling lands.**
+- **PRISM-EAGLE3 / vLLM 0.22 EAGLE3 are likely lateral, not breakthroughs:**
+  PRISM's accept length τ≈2.2–2.4 ≈ the MTP n=3 already in production; its
+  headline numbers are BF16-target (won't fit 24 GB) on Blackwell. vLLM 0.22
+  EAGLE3-on-hybrid is unverified (all benchmarks GB200), and SGLang INT4 still
+  hits the Marlin `size_n` + SSM-dtype double-bug.
+
+### Standing conclusion
+
+The realistic single-3090 ceiling **at temp=0.6** remains the **vLLM+Genesis+MTP
+~67 t/s code** production stack. The genuine unlock is still a higher
+accept-length drafter that works under *sampling*. Watch (in priority order):
+1. **Luce DFlash + Leviathan tree rejection sampling** (their roadmap) → makes the
+   greedy speed available at temp=0.6.
+2. **vLLM EAGLE3 confirmed on Qwen3.6 hybrid + quantized target** (needs a
+   non-Blackwell repro) — only then is a PRISM-full fresh-venv test worth it.
+
+### Lower-priority next steps
+
+1. Greedy deterministic codegen only: sweep Luce KV type (f16 vs TQ3) +
+   `chain_seed` to lift base decode 19→~35 and greedy code 58→~90.
+2. vLLM 0.22 + EAGLE3 + PRISM-full fresh venv — only after #2 above is confirmed.
+
+(Superseded April recommendations: ExL3 + DFlash 2.50bpw — no ExL3 DFlash exists;
+ExL3 + DFlash TP=2 — needs GPU 1, and DFlash is greedy-only anyway.)
 
 ## Files
 
