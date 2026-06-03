@@ -1,0 +1,177 @@
+{
+  "model": "qwen3.6-27b",
+  "pass": 12,
+  "n": 34,
+  "results": [
+    {
+      "name": "affine-cipher",
+      "pass": true,
+      "gen_s": 43.0
+    },
+    {
+      "name": "beer-song",
+      "pass": true,
+      "gen_s": 26.0
+    },
+    {
+      "name": "book-store",
+      "pass": true,
+      "gen_s": 41.5
+    },
+    {
+      "name": "bottle-song",
+      "pass": true,
+      "gen_s": 25.1
+    },
+    {
+      "name": "bowling",
+      "pass": false,
+      "gen_s": 52.5
+    },
+    {
+      "name": "connect",
+      "pass": false,
+      "gen_s": 102.8
+    },
+    {
+      "name": "dominoes",
+      "pass": true,
+      "gen_s": 47.9
+    },
+    {
+      "name": "dot-dsl",
+      "pass": false,
+      "gen_s": 43.0
+    },
+    {
+      "name": "food-chain",
+      "pass": false,
+      "gen_s": 37.4
+    },
+    {
+      "name": "forth",
+      "pass": false,
+      "gen_s": 89.2
+    },
+    {
+      "name": "go-counting",
+      "pass": false,
+      "gen_s": 42.4
+    },
+    {
+      "name": "grade-school",
+      "pass": false,
+      "gen_s": 21.6
+    },
+    {
+      "name": "grep",
+      "pass": false,
+      "gen_s": 25.9
+    },
+    {
+      "name": "hangman",
+      "pass": false,
+      "gen_s": 27.0
+    },
+    {
+      "name": "list-ops",
+      "pass": false,
+      "gen_s": 22.3
+    },
+    {
+      "name": "paasio",
+      "pass": false,
+      "gen_s": 30.4
+    },
+    {
+      "name": "phone-number",
+      "pass": false,
+      "gen_s": 24.3
+    },
+    {
+      "name": "pig-latin",
+      "pass": true,
+      "gen_s": 57.2
+    },
+    {
+      "name": "poker",
+      "pass": true,
+      "gen_s": 52.3
+    },
+    {
+      "name": "pov",
+      "pass": false,
+      "gen_s": 43.1
+    },
+    {
+      "name": "proverb",
+      "pass": true,
+      "gen_s": 12.9
+    },
+    {
+      "name": "react",
+      "pass": false,
+      "gen_s": 81.5
+    },
+    {
+      "name": "rest-api",
+      "pass": false,
+      "gen_s": 47.3
+    },
+    {
+      "name": "robot-name",
+      "pass": true,
+      "gen_s": 10.9
+    },
+    {
+      "name": "scale-generator",
+      "pass": false,
+      "gen_s": 149.6
+    },
+    {
+      "name": "sgf-parsing",
+      "pass": false,
+      "gen_s": 76.7
+    },
+    {
+      "name": "simple-linked-list",
+      "pass": true,
+      "gen_s": 19.3
+    },
+    {
+      "name": "transpose",
+      "pass": false,
+      "gen_s": 77.2
+    },
+    {
+      "name": "tree-building",
+      "pass": false,
+      "gen_s": 32.7
+    },
+    {
+      "name": "two-bucket",
+      "pass": true,
+      "gen_s": 42.5
+    },
+    {
+      "name": "variable-length-quantity",
+      "pass": false,
+      "gen_s": 31.8
+    },
+    {
+      "name": "wordy",
+      "pass": false,
+      "gen_s": 37.4
+    },
+    {
+      "name": "zebra-puzzle",
+      "pass": false,
+      "gen_s": 148.7
+    },
+    {
+      "name": "zipper",
+      "pass": true,
+      "gen_s": 52.2
+    }
+  ]
+}

@@ -41,13 +41,39 @@ clean 10 KB implementation that failed one callback-edge-case test (1 passed /
 The 23.5% is the realistic floor for **interactive thinking-OFF** use, mirroring
 the LCB v6 thinking-OFF result (32% on the easier LCB set).
 
-## Pending: 27B Dense comparison
+## 27B Dense vs 35B-A3B — head-to-head (same 34 exercises, identical config)
 
-Not yet run — requires a model swap (stop 35B, load 27B alone on GPU 0; **one
-model at a time** per the power-crash finding below). Research predicts the 27B
-wins on hard problems; an empirical `aider_lite` 27B number would confirm. A
-reasoning-ON + 2-attempt run on both models is the way to get leaderboard-comparable
-numbers.
+Both temp 0.6, thinking OFF, whole-file, single-attempt. 27B run via Madreag
+turboquant llama-server (UD-Q4_K_XL) on GPU 0, **one model at a time** (35B stopped
+during the 27B run, then restored) per the power-reset finding.
+
+| Model | pass@1 | wall | t/s class |
+|-------|-------:|-----:|-----------|
+| Qwen3.6-35B-A3B (MoE, 3B active) | 8/34 = **23.5%** | 318 s (~9 s/ex) | ~100 t/s |
+| **Qwen3.6-27B (Dense)** | 12/34 = **35.3%** | 1683 s (~49 s/ex) | ~30 t/s |
+
+**The 27B Dense wins — +50% relative (12 vs 8 passes)** — empirically confirming the
+research prediction that the all-active 27B beats the 3B-active MoE on hard
+multi-step problems. Cost: ~5× slower wall (dense 27B ~30 t/s and longer outputs).
+
+Caveats: single-attempt @ temp 0.6 has run-to-run variance (e.g. the 35B passed
+food-chain/hangman/list-ops that the 27B missed, and vice versa); the 4-exercise
+gap on n=34 is directional, not high-precision. The *direction* matches every other
+signal (LCB v6, SWE-bench Pro, Terminal-Bench).
+
+Per-exercise both-pass: affine-cipher, pig-latin, simple-linked-list, two-bucket.
+27B-only passes: book-store, beer-song, bottle-song, dominoes, poker, proverb,
+robot-name, zipper. 35B-only passes: food-chain, hangman, list-ops,
+variable-length-quantity.
+
+**Takeaway:** for hard one-shot coding, switch to the 27B (worth the slowdown);
+for interactive speed, the 35B-A3B stays the daily driver — exactly the split the
+research recommended.
+
+### Still TODO for leaderboard-comparable numbers
+A reasoning-ON + 2-attempt (diff-format, test-feedback) run on both models. Expect
+both to jump substantially — thinking ON is where these models earn their LCB/SWE
+scores.
 
 ## Reproduce
 
