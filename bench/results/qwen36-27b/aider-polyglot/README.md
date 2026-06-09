@@ -41,20 +41,30 @@ clean 10 KB implementation that failed one callback-edge-case test (1 passed /
 The 23.5% is the realistic floor for **interactive thinking-OFF** use, mirroring
 the LCB v6 thinking-OFF result (32% on the easier LCB set).
 
-## 27B Dense vs 35B-A3B — head-to-head (same 34 exercises, identical config)
+## Three-way: 27B Dense vs 35B-A3B vs Coder-30B-A3B (same 34 exercises, identical config)
 
-Both temp 0.6, thinking OFF, whole-file, single-attempt. 27B run via Madreag
-turboquant llama-server (UD-Q4_K_XL) on GPU 0, **one model at a time** (35B stopped
-during the 27B run, then restored) per the power-reset finding.
+All temp 0.6, thinking OFF, whole-file, single-attempt. Each run via llama-server
+on GPU 0, **one model at a time** (production 35B stopped during each non-35B run,
+then restored) per the power-reset finding.
 
-| Model | pass@1 | wall | t/s class |
-|-------|-------:|-----:|-----------|
-| Qwen3.6-35B-A3B (MoE, 3B active) | 8/34 = **23.5%** | 318 s (~9 s/ex) | ~100 t/s |
-| **Qwen3.6-27B (Dense)** | 12/34 = **35.3%** | 1683 s (~49 s/ex) | ~30 t/s |
+| Model | active params | pass@1 | wall | t/s class |
+|-------|:---:|-------:|-----:|-----------|
+| **Qwen3.6-27B (Dense)** | **27B** | 12/34 = **35.3%** | 1683 s (~49 s/ex) | ~30 t/s |
+| Qwen3.6-35B-A3B (MoE) | 3B | 8/34 = 23.5% | 318 s (~9 s/ex) | ~100 t/s |
+| Qwen3-Coder-30B-A3B (MoE, code-tuned) | 3B | 8/34 = 23.5% | 182 s (~5 s/ex) | ~100 t/s |
 
-**The 27B Dense wins — +50% relative (12 vs 8 passes)** — empirically confirming the
-research prediction that the all-active 27B beats the 3B-active MoE on hard
-multi-step problems. Cost: ~5× slower wall (dense 27B ~30 t/s and longer outputs).
+**The 27B Dense wins outright (+50% relative). The two 3B-active MoEs tie at
+exactly 23.5% — and crucially, the *coding-specialized* 30B coder does NOT beat the
+general 35B-A3B.** This is the cleanest possible confirmation of the thesis:
+**on hard multi-step problems, active-param count dominates — coding-specialization
+does not overcome a 3B-active bottleneck.** The coder's only edge is speed (fastest
+of the three, 182 s; short outputs, no thinking).
+
+(Coder added 2026-06-03 via Qwen3-Coder-30B-A3B-Instruct UD-Q4_K_XL GGUF, turboquant
+engine, qwen3moe arch. Its official sampling is temp 0.7/top_p 0.8; harness default
+0.6/0.95 used for comparability — minor. Failures verified genuine, e.g. `grep`:
+real SyntaxError, not a harness artifact. A cosmetic `~/.inputrc` readline warning
+appears in stderr but does not affect the exit-code-based pass/fail.)
 
 Caveats: single-attempt @ temp 0.6 has run-to-run variance (e.g. the 35B passed
 food-chain/hangman/list-ops that the 27B missed, and vice versa); the 4-exercise

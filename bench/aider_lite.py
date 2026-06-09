@@ -102,6 +102,10 @@ def main():
         results.append({"name": name, "pass": ok, "gen_s": round(gen_s, 1)})
         print(f"[{i}/{len(names)}] {name:24} {'PASS' if ok else 'FAIL'}  ({gen_s:.0f}s)"
               + ("" if ok else f"  …{tail.splitlines()[-1][:70] if tail.strip() else ''}"), flush=True)
+        # crash-resilient incremental write (this box dies often)
+        if args.out:
+            with open(args.out + ".jsonl", "a") as f:
+                f.write(json.dumps({"name": name, "pass": ok, "gen_s": round(gen_s, 1)}) + "\n")
 
     n = len(results); p = sum(r["pass"] for r in results)
     print(f"\n=== {args.model}: pass@1 = {p}/{n} = {100*p/n:.1f}%  (whole-file, single-attempt, python subset)")
