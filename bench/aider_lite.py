@@ -42,10 +42,10 @@ def extract_code(text):
         return max(blocks, key=len).strip()
     return text.strip()
 
-def call(url, model, key, prompt, max_tokens=3000, timeout=300):
+def call(url, model, key, prompt, max_tokens=3000, timeout=600, think=False):
     body = {"model": model, "messages": [{"role": "user", "content": prompt}],
             "max_tokens": max_tokens, "temperature": 0.6, "top_p": 0.95, "top_k": 20,
-            "chat_template_kwargs": {"enable_thinking": False}}
+            "chat_template_kwargs": {"enable_thinking": bool(think)}}
     req = urllib.request.Request(url.rstrip("/") + "/v1/chat/completions",
                                  data=json.dumps(body).encode(),
                                  headers={"Content-Type": "application/json",
@@ -81,7 +81,10 @@ def main():
     ap.add_argument("--py", default=sys.executable)
     ap.add_argument("--out", default=None)
     ap.add_argument("--exercises", default=None, help="comma-separated names; else first N alphabetically")
+    ap.add_argument("--think", action="store_true", help="enable_thinking:true (needs server reasoning-budget>0)")
+    ap.add_argument("--max-tokens", type=int, default=0, help="0=auto (3000, or 20000 with --think)")
     args = ap.parse_args()
+    max_tokens = args.max_tokens or (20000 if args.think else 3000)
 
     all_ex = sorted(d for d in os.listdir(PRACTICE) if os.path.isdir(os.path.join(PRACTICE, d)))
     names = args.exercises.split(",") if args.exercises else all_ex[:args.n]
@@ -93,7 +96,7 @@ def main():
         slug, _, prompt = build_prompt(ex_dir, name)
         try:
             ts = time.time()
-            out = call(args.url, args.model, args.key, prompt)
+            out = call(args.url, args.model, args.key, prompt, max_tokens=max_tokens, think=args.think)
             gen_s = time.time() - ts
             code = extract_code(out)
             ok, tail = run_tests(ex_dir, name, code, args.py)

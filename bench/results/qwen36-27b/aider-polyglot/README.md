@@ -80,10 +80,36 @@ variable-length-quantity.
 for interactive speed, the 35B-A3B stays the daily driver — exactly the split the
 research recommended.
 
+## Reasoning-ON experiment (35B-A3B) — thinking HURT here (2026-06-09)
+
+Re-ran the 35B with `enable_thinking:true` (server `REASONING_BUDGET=24000`,
+request `max_tokens=20000`), same 34 exercises, single attempt:
+
+**pass@1 = 7/34 = 20.6% — *worse* than thinking-OFF (8/34 = 23.5%).** Wall 3397 s
+(~100 s/ex, 10× slower).
+
+Root cause (verified, not assumed): the 3B-active MoE **overthinks and never
+converges** on several problems. On `affine-cipher` (a *trivial* exercise that
+passes thinking-OFF), thinking-ON produced **57,021 chars of `reasoning_content`,
+hit the 20k-token cap (`finish_reason: length`), and emitted an EMPTY answer**
+(`content` len 0). Five exercises ran the full ~210 s (= 20k tokens @ ~95 t/s) and
+failed the same way. So thinking didn't improve quality — it spiraled and truncated.
+
+**The config bug:** `max_tokens` (20k) was hit *before* the reasoning budget (24k)
+could force a `</think>`. To benefit from thinking you must set the **reasoning
+budget BELOW max_tokens** (e.g. budget 6–8k, max_tokens 16k) so the model is forced
+to stop reasoning and answer — and/or use the official **2-attempt** protocol. A
+naive "thinking ON" is a *net negative* for single-shot whole-file on the 35B-A3B.
+
+(Production reverted to `REASONING_BUDGET=0` after this run — daily driver stays
+non-thinking by default. Raw: `aider_35b_think.json`.)
+
 ### Still TODO for leaderboard-comparable numbers
-A reasoning-ON + 2-attempt (diff-format, test-feedback) run on both models. Expect
-both to jump substantially — thinking ON is where these models earn their LCB/SWE
-scores.
+A reasoning-ON run with **budget < max_tokens** (forced convergence) + the official
+**2-attempt** diff-format protocol. The naive thinking-ON above shows the budget
+discipline matters more than just flipping thinking on. The 27B Dense (all-active,
+less prone to the MoE overthinking spiral) is the better candidate for a forced-budget
+thinking run.
 
 ## Reproduce
 
