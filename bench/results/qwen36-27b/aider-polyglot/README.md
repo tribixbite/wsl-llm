@@ -96,20 +96,44 @@ hit the 20k-token cap (`finish_reason: length`), and emitted an EMPTY answer**
 failed the same way. So thinking didn't improve quality — it spiraled and truncated.
 
 **The config bug:** `max_tokens` (20k) was hit *before* the reasoning budget (24k)
-could force a `</think>`. To benefit from thinking you must set the **reasoning
-budget BELOW max_tokens** (e.g. budget 6–8k, max_tokens 16k) so the model is forced
-to stop reasoning and answer — and/or use the official **2-attempt** protocol. A
-naive "thinking ON" is a *net negative* for single-shot whole-file on the 35B-A3B.
+could force a `</think>`. The fix: set the **reasoning budget BELOW max_tokens** so
+the model is forced to stop reasoning and answer.
 
-(Production reverted to `REASONING_BUDGET=0` after this run — daily driver stays
-non-thinking by default. Raw: `aider_35b_think.json`.)
+### The fix works — forced-budget thinking (budget 6k < max 14k): 11/34 = 32.4%
 
-### Still TODO for leaderboard-comparable numbers
-A reasoning-ON run with **budget < max_tokens** (forced convergence) + the official
-**2-attempt** diff-format protocol. The naive thinking-ON above shows the budget
-discipline matters more than just flipping thinking on. The 27B Dense (all-active,
-less prone to the MoE overthinking spiral) is the better candidate for a forced-budget
-thinking run.
+Re-ran with `REASONING_BUDGET=6000`, `max_tokens=14000` (budget < max → server
+injects `</think>` at 6k thinking tokens, leaving 8k for the answer). Verified
+convergence first (affine-cipher: `finish_reason: stop`, real code emitted).
+
+| 35B-A3B config | pass@1 | wall |
+|---|---:|---:|
+| thinking OFF | 8/34 = 23.5% | 318 s |
+| naive thinking (budget 24k ≥ max 20k → spiral) | 7/34 = 20.6% | 3397 s |
+| **forced-budget thinking (budget 6k < max 14k)** | **11/34 = 32.4%** | 2274 s |
+
+**Thinking lifts the 35B-A3B +38% relative (8→11) — but ONLY with budget
+discipline.** Naive thinking-ON *hurt* (spiral/truncation); forced-budget thinking
+*helped* and nearly catches the thinking-OFF 27B Dense (12/34 = 35.3%).
+
+### Four-way summary (single-attempt, whole-file, 34 python exercises)
+
+| Model / mode | pass@1 |
+|---|---:|
+| Qwen3.6-27B Dense, thinking OFF | **12/34 = 35.3%** |
+| Qwen3.6-35B-A3B, forced-budget thinking | 11/34 = 32.4% |
+| Qwen3.6-35B-A3B, thinking OFF | 8/34 = 23.5% |
+| Qwen3-Coder-30B-A3B, thinking OFF | 8/34 = 23.5% |
+| Qwen3.6-35B-A3B, naive thinking | 7/34 = 20.6% |
+
+**Operational recommendation:** if you want thinking on the 35B-A3B, set
+`REASONING_BUDGET` to ~6000 (NOT 0 and NOT ≥ your max_tokens) and keep max_tokens
+≥ ~14000. Production left at `REASONING_BUDGET=0` (non-thinking default) per the
+daily-driver preference; flip per-request with a sane budget when you want the
+quality bump. Raws: `aider_35b_think.json` (naive), `aider_35b_think6k.json` (fixed).
+
+### Still TODO
+The official **2-attempt** diff-format protocol, and a forced-budget thinking run on
+the **27B Dense** (~5 h at ~30 t/s; all-active, so likely the strongest config of all).
 
 ## Reproduce
 
