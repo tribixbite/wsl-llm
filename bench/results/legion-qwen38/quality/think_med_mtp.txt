@@ -3,3 +3,22 @@
 [3/34] book-store               PASS  (175s)
 [4/34] bottle-song              FAIL  (23s)  …1 failed in 0.17s
 [5/34] bowling                  PASS  (75s)
+[6/34] connect                  FAIL  (105s)  …1 failed in 0.16s
+[7/34] dominoes                 FAIL  (101s)  …1 failed, 1 passed in 0.20s
+[8/34] dot-dsl                  FAIL  (31s)  …1 failed, 6 passed in 0.17s
+[9/34] food-chain               PASS  (36s)
+[10/34] forth                    FAIL  (75s)  …1 failed, 45 passed in 0.26s
+[11/34] go-counting              FAIL  (43s)  …1 error in 0.22s
+[12/34] grade-school             FAIL  (14s)  …1 failed in 0.17s
+[13/34] grep                     FAIL  (26s)  …1 failed in 0.17s
+[14/34] hangman                  FAIL  (20s)  …1 failed in 0.16s
+[15/34] list-ops                 FAIL  (26s)  …1 failed, 12 passed in 0.21s
+[16/34] paasio                   FAIL  (28s)  …1 failed in 0.18s
+[17/34] phone-number             FAIL  (38s)  …1 failed, 17 passed in 0.20s
+[18/34] pig-latin                PASS  (57s)
+[19/34] poker                    PASS  (43s)
+[20/34] pov                      FAIL  (160s)  …1 failed, 9 passed in 0.17s
+[21/34] proverb                  FAIL  (21s)  …1 failed in 0.16s
+[22/34] react                    FAIL  (132s)  …1 failed, 1 passed in 0.17s
+[23/34] rest-api                 FAIL  (54s)  …1 failed in 0.16s
+[24/34] robot-name               PASS  (15s)

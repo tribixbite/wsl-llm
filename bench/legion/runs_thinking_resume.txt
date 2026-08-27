@@ -1,0 +1,4 @@
+# Resume of think_med_mtp after a machine reboot killed it at 24/34.
+# aider_lite appends to a .jsonl per exercise, so the first 24 are intact;
+# this run covers only the 10 that never executed.
+think_med_mtp_resume|-c 32768 -ctk q8_0 -ctv q8_0 --parallel 1 --reasoning-effort medium --spec-type draft-mtp -md /home/will/models/Qwen3.8-27B-GGUF/MTP/mtp-Qwen3.8-27B-Q4_0.gguf|--think --exercises scale-generator,sgf-parsing,simple-linked-list,transpose,tree-building,two-bucket,variable-length-quantity,wordy,zebra-puzzle,zipper

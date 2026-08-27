@@ -1,0 +1,14 @@
+[1/10] scale-generator          FAIL  (146s)  …1 failed in 0.19s
+[2/10] sgf-parsing              PASS  (203s)
+[3/10] simple-linked-list       FAIL  (36s)  …1 failed in 0.15s
+[4/10] transpose                PASS  (72s)
+[5/10] tree-building            FAIL  (51s)  …1 failed, 1 passed in 0.15s
+[6/10] two-bucket               PASS  (78s)
+[7/10] variable-length-quantity PASS  (39s)
+[8/10] wordy                    FAIL  (56s)  …1 failed, 15 passed in 0.15s
+[9/10] zebra-puzzle             PASS  (59s)
+[10/10] zipper                   FAIL  (32s)  …1 failed, 1 passed in 0.15s
+
+=== qwen3.8-27b-think_med_mtp_resume: pass@1 = 5/10 = 50.0%  (whole-file, single-attempt, python subset)
+    wall=781s
+    wrote /home/will/git/wsl-llm/bench/results/legion-qwen38/quality/think_med_mtp_resume.json

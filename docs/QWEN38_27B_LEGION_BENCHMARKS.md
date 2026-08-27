@@ -17,7 +17,7 @@
 | **MTP speculative decoding** (the 1.28 GiB draft head Unsloth ships) | **1.89× overall, 2.14× on code** — 39.8 → 75.3 t/s |
 | MTP costs **no measurable accuracy** (n=102/arm, p=0.59) | the speedup is effectively free |
 | **WSL2 ≈ native Windows** for fully-GPU-resident inference | within ±2% — no reason to migrate |
-| **Thinking mode dominates accuracy** | see §6 |
+| **Thinking mode** (`reasoning_effort=medium`) | **38.2% vs 20.6% pass@1**, p=0.040 |
 | Context is nearly free — only 16 of 64 layers hold a KV cache | 64k ctx costs ~2.5% decode |
 
 **Recommended daily driver:**
@@ -27,9 +27,11 @@
   -m ~/models/Qwen3.8-27B-GGUF/Qwen3.8-27B-UD-Q3_K_XL.gguf \
   -ngl 99 -fa on -c 32768 -ctk q4_0 -ctv q4_0 --parallel 1 \
   --spec-type draft-mtp -md ~/models/Qwen3.8-27B-GGUF/MTP/mtp-Qwen3.8-27B-Q4_0.gguf \
-  --jinja --host 127.0.0.1 --port 8080
+  --jinja --reasoning-effort medium \
+  --host 127.0.0.1 --port 8080
 ```
-→ **~74 t/s, 14,704 MiB peak, 1.6 GiB headroom, 32k context.**
+→ **~74 t/s, 14,704 MiB peak, 1.6 GiB headroom, 32k context, 38.2% pass@1.**
+Leave thinking ON: disabling it drops pass@1 from 38.2% to 20.6%.
 
 ---
 
@@ -215,10 +217,31 @@ So llama.cpp's MTP is not distribution-preserving — it changes numerics enough
 near-tie tokens (batch-shape-dependent FP reduction order). The pooled quality test above is
 what settles whether that matters: it does not.
 
-### Thinking mode
-See `bench/results/legion-qwen38/quality/think_med_mtp.*`. Qwen3.8 is **thinking-first**
-(`reasoning_effort` defaults to `xhigh`); at `xhigh` an exercise cost ~220 s, so `medium` is
-the practical setting.
+### Thinking mode is the single biggest accuracy lever
+
+Qwen3.8 is **thinking-first** (`reasoning_effort` defaults to `xhigh`). At `xhigh` an exercise
+cost ~220 s, so `medium` is the practical setting.
+
+| config | pass@1 | |
+|---|---:|---|
+| non-thinking (pooled, n=102) | 20.6% | |
+| **thinking, `reasoning_effort=medium`, MTP on** | **38.2%** (13/34) | **z=2.06, p=0.040 — significant** |
+
+**Thinking nearly doubles pass@1.** Given Qwen ships thinking on by default, do not disable it
+for coding work — `--reasoning-budget 0` is a throughput optimisation that costs a lot of accuracy.
+
+### Cross-machine comparison (same harness, same 34 Python exercises)
+
+| model / config | pass@1 | machine |
+|---|---:|---|
+| **Qwen3.8-27B UD-Q3_K_XL, think(med)+MTP** | **38.2%** | **RTX 5080 Laptop 16 GB** |
+| Qwen3.6-27B | 35.3% | 2×RTX 3090 (24 GB, Q4) |
+| Qwen3.6-35B-A3B, forced-budget thinking | 32.4% | 2×RTX 3090 |
+| Qwen3.8-27B UD-Q3_K_XL, non-thinking | 20.6% | RTX 5080 Laptop |
+
+The 16 GB laptop at a 3-bit quant edges out the 24 GB desktop's Qwen3.6-27B at 4-bit — though
+with n=34 the 38.2% vs 35.3% gap is well inside the noise band this benchmark exhibits (see the
+warning above), so read it as "comparable", not "better".
 
 ---
 
@@ -274,7 +297,9 @@ laptop Blackwell; none occurred here across hours of runs, and graphs are worth 
 
 ## 9. Open items / not verified
 
-- Thinking-mode pass@1 at `xhigh` (too slow to complete: ~220 s/exercise).
+- Thinking-mode pass@1 at `xhigh` (too slow: ~220 s/exercise). `medium` is measured at 38.2%.
+- The thinking run was interrupted by a machine reboot at 24/34 and resumed for the
+  remaining 10 exercises; `aider_lite` appends per-exercise JSONL, so the merge is exact.
 - No KL-divergence vs a Q8_0 baseline yet. Note the logits file would be ~23.6 GiB at
   `--chunks 200` given the 248k vocab, so `--chunks` must be bounded.
 - `UD-Q3_K_XL` revision `408fcc18` (no 2-bit tensors) not benchmarked against current.

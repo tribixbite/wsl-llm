@@ -236,3 +236,40 @@ before committing the daily driver.
 ## Notes
 - Model is dense 27B (BF16 ≈ 50.9 GiB across 2 shards).
 - Repo ships an MTP head → self-speculative decoding is available; likely the biggest throughput lever on a bandwidth-bound laptop GPU.
+
+
+---
+
+## FINAL RESULTS (2026-08-27)
+
+Full report: `docs/QWEN38_27B_LEGION_BENCHMARKS.md`.
+
+**Speed (175 W, --parallel 1, -fa on, CUDA graphs on):**
+| config | decode | VRAM |
+|---|---:|---:|
+| llama.cpp baseline 32k q8_0 | 39.81 t/s | 13,388 MiB |
+| ExLlamaV3 3.0bpw (Windows) | 44.07 t/s | 13,414 MiB |
+| **llama.cpp + MTP 32k q4_0** | **74.09 t/s** | 14,704 MiB |
+| llama.cpp + MTP (code prompt) | **85.0 t/s** | |
+
+**Accuracy (aider_lite, 34 python exercises):**
+| config | pass@1 | |
+|---|---:|---|
+| non-thinking, pooled n=102 | 20.6% | |
+| **thinking (medium) + MTP** | **38.2%** | z=2.06, p=0.040 significant |
+| baseline vs MTP | 20.6% vs 17.6% | p=0.59 — MTP costs nothing |
+
+**Decisions taken:**
+- Daily driver = llama.cpp + MTP + `--reasoning-effort medium`, 32k, q4_0 KV, `--parallel 1`.
+- vLLM/SGLang abandoned: no 4-bit safetensors quant fits 16 GB (smallest 17.69 GiB).
+- Stay on WSL2: native Windows is within ±2%.
+- Keep CUDA graphs ON (+20%); the reported laptop-Blackwell hang did not reproduce.
+
+**Still open:**
+- `wsl --update` (2.4.13 → 2.7.11) not applied — user agreed to it but it was deferred so it
+  would not restart WSL mid-benchmark.
+- KL-divergence vs Q8_0 baseline not run (logits file ~23.6 GiB at --chunks 200, vocab 248k).
+- `UD-Q3_K_XL` revision `408fcc18` (no 2-bit tensors) not benchmarked against the current V3 build.
+- Official aider-polyglot (diff format, multi-language) not run — only the whole-file Python subset.
+- ExLlamaV3 accuracy not measured (needs TabbyAPI for an OpenAI endpoint).
+- Ollama / LM Studio not benchmarked (both vendor llama.cpp).

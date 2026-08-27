@@ -1,0 +1,57 @@
+{
+  "model": "qwen3.8-27b-think_med_mtp_resume",
+  "pass": 5,
+  "n": 10,
+  "results": [
+    {
+      "name": "scale-generator",
+      "pass": false,
+      "gen_s": 146.3
+    },
+    {
+      "name": "sgf-parsing",
+      "pass": true,
+      "gen_s": 203.2
+    },
+    {
+      "name": "simple-linked-list",
+      "pass": false,
+      "gen_s": 36.0
+    },
+    {
+      "name": "transpose",
+      "pass": true,
+      "gen_s": 72.2
+    },
+    {
+      "name": "tree-building",
+      "pass": false,
+      "gen_s": 50.6
+    },
+    {
+      "name": "two-bucket",
+      "pass": true,
+      "gen_s": 78.4
+    },
+    {
+      "name": "variable-length-quantity",
+      "pass": true,
+      "gen_s": 38.6
+    },
+    {
+      "name": "wordy",
+      "pass": false,
+      "gen_s": 56.4
+    },
+    {
+      "name": "zebra-puzzle",
+      "pass": true,
+      "gen_s": 59.5
+    },
+    {
+      "name": "zipper",
+      "pass": false,
+      "gen_s": 32.1
+    }
+  ]
+}
