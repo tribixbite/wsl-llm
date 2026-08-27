@@ -1,0 +1,10 @@
+[1/4] bottle-song              PASS@2  (13s)
+[2/4] book-store               FAIL    (50s)  …1 failed in 0.15s
+[3/4] connect                  FAIL    (35s)  …1 failed, 1 passed in 0.14s
+[4/4] dominoes                 FAIL    (22s)  …1 failed, 1 passed in 0.15s
+
+=== qwen3.8-27b-smoke_tries2 (whole-file, python subset, tries=2)
+    pass@1 = 0/4 = 0.0%
+    pass@2 = 1/4 = 25.0%   <- aider leaderboard headline metric
+    wall=125s
+    wrote /home/will/git/wsl-llm/bench/results/legion-qwen38/quality/smoke_tries2.json

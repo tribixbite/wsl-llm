@@ -1,0 +1,3 @@
+# Full 34-exercise runs with tries=2 (aider leaderboard methodology).
+think_med_mtp_t2|-c 32768 -ctk q8_0 -ctv q8_0 --parallel 1 --reasoning-effort medium --spec-type draft-mtp -md /home/will/models/Qwen3.8-27B-GGUF/MTP/mtp-Qwen3.8-27B-Q4_0.gguf|--think
+nothink_mtp_t2|-c 32768 -ctk q8_0 -ctv q8_0 --parallel 1 --reasoning-budget 0 --spec-type draft-mtp -md /home/will/models/Qwen3.8-27B-GGUF/MTP/mtp-Qwen3.8-27B-Q4_0.gguf|

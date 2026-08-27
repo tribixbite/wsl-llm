@@ -1,0 +1,38 @@
+{
+  "model": "qwen3.8-27b-smoke_tries2",
+  "tries": 2,
+  "n": 4,
+  "pass": 1,
+  "pass1": 0,
+  "pass2": 1,
+  "results": [
+    {
+      "name": "bottle-song",
+      "pass": true,
+      "pass1": false,
+      "pass2": true,
+      "gen_s": 12.6
+    },
+    {
+      "name": "book-store",
+      "pass": false,
+      "pass1": false,
+      "pass2": false,
+      "gen_s": 49.8
+    },
+    {
+      "name": "connect",
+      "pass": false,
+      "pass1": false,
+      "pass2": false,
+      "gen_s": 35.2
+    },
+    {
+      "name": "dominoes",
+      "pass": false,
+      "pass1": false,
+      "pass2": false,
+      "gen_s": 21.5
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+smoke_tries2|-c 32768 -ctk q8_0 -ctv q8_0 --parallel 1 --reasoning-budget 0 --spec-type draft-mtp -md /home/will/models/Qwen3.8-27B-GGUF/MTP/mtp-Qwen3.8-27B-Q4_0.gguf|--exercises bottle-song,book-store,connect,dominoes
