@@ -1,0 +1,4 @@
+{"name": "affine-cipher", "pass": true, "gen_s": 13.1}
+{"name": "beer-song", "pass": false, "gen_s": 9.9}
+{"name": "book-store", "pass": false, "gen_s": 45.3}
+{"name": "bottle-song", "pass": true, "gen_s": 10.8}
