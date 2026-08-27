@@ -1,0 +1,7 @@
+# Repeated A/B for MTP quality. aider_lite samples at temp 0.6 with no seed, so
+# a single 34-exercise run has wide error bars: the first pair (10/34 vs 5/34)
+# is only p~0.18 by McNemar. Three runs per arm gives n=102 per arm.
+nothink_baseline_r2|-c 32768 -ctk q8_0 -ctv q8_0 --parallel 1 --reasoning-budget 0|
+nothink_mtp_r2|-c 32768 -ctk q8_0 -ctv q8_0 --parallel 1 --reasoning-budget 0 --spec-type draft-mtp -md /home/will/models/Qwen3.8-27B-GGUF/MTP/mtp-Qwen3.8-27B-Q4_0.gguf|
+nothink_baseline_r3|-c 32768 -ctk q8_0 -ctv q8_0 --parallel 1 --reasoning-budget 0|
+nothink_mtp_r3|-c 32768 -ctk q8_0 -ctv q8_0 --parallel 1 --reasoning-budget 0 --spec-type draft-mtp -md /home/will/models/Qwen3.8-27B-GGUF/MTP/mtp-Qwen3.8-27B-Q4_0.gguf|

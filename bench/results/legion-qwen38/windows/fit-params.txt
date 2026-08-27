@@ -1,0 +1,8 @@
+C:\llm\bin\llama-fit-params.exe : 0.00.918.725 I llama_fit_params: printing fitted CLI arguments to stdout...
+At line:3 char:1
++ C:\llm\bin\llama-fit-params.exe -m 'C:\llm\models\Qwen3.8-27B-UD-Q3_K ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (0.00.918.725 I ...ts to stdout...:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+-c 24832 -ngl -1

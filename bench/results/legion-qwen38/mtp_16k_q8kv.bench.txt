@@ -1,0 +1,4 @@
+[mtp_16k_q8kv/prose] decode=58.12 t/s  ttft=385ms  tokens=800  wall=14.15s
+[mtp_16k_q8kv/code] decode=84.13 t/s  ttft=408ms  tokens=800  wall=9.92s
+[mtp_16k_q8kv/json] decode=85.05 t/s  ttft=408ms  tokens=800  wall=9.81s
+[mtp_16k_q8kv] AVG decode = 75.77 t/s over 3 prompts

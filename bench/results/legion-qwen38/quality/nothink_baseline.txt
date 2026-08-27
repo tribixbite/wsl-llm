@@ -1,0 +1,38 @@
+[1/34] affine-cipher            PASS  (17s)
+[2/34] beer-song                FAIL  (11s)  …1 error in 0.25s
+[3/34] book-store               FAIL  (77s)  …1 error in 0.23s
+[4/34] bottle-song              PASS  (16s)
+[5/34] bowling                  FAIL  (21s)  …1 failed, 4 passed in 0.16s
+[6/34] connect                  FAIL  (36s)  …1 failed in 0.17s
+[7/34] dominoes                 FAIL  (15s)  …1 failed in 0.17s
+[8/34] dot-dsl                  FAIL  (36s)  …1 failed, 1 passed in 0.16s
+[9/34] food-chain               FAIL  (19s)  …1 failed, 4 passed in 0.16s
+[10/34] forth                    FAIL  (55s)  …1 failed, 45 passed in 0.19s
+[11/34] go-counting              FAIL  (31s)  …1 error in 0.21s
+[12/34] grade-school             FAIL  (6s)  …1 failed in 0.16s
+[13/34] grep                     FAIL  (16s)  …1 failed in 0.17s
+[14/34] hangman                  FAIL  (9s)  …1 failed in 0.17s
+[15/34] list-ops                 PASS  (11s)
+[16/34] paasio                   FAIL  (16s)  …1 failed in 0.19s
+[17/34] phone-number             FAIL  (15s)  …1 failed, 17 passed in 0.17s
+[18/34] pig-latin                PASS  (13s)
+[19/34] poker                    PASS  (35s)
+[20/34] pov                      FAIL  (27s)  …1 failed, 9 passed in 0.18s
+[21/34] proverb                  PASS  (4s)
+[22/34] react                    FAIL  (10s)  …1 failed, 1 passed in 0.18s
+[23/34] rest-api                 FAIL  (18s)  …1 failed in 0.17s
+[24/34] robot-name               PASS  (5s)
+[25/34] scale-generator          FAIL  (28s)  …1 failed in 0.17s
+[26/34] sgf-parsing              FAIL  (79s)  …1 error in 0.26s
+[27/34] simple-linked-list       PASS  (11s)
+[28/34] transpose                FAIL  (11s)  …1 failed, 1 passed in 0.17s
+[29/34] tree-building            FAIL  (11s)  …1 failed, 1 passed in 0.17s
+[30/34] two-bucket               PASS  (34s)
+[31/34] variable-length-quantity FAIL  (12s)  …1 failed, 7 passed in 0.17s
+[32/34] wordy                    FAIL  (17s)  …1 failed, 1 passed in 0.19s
+[33/34] zebra-puzzle             PASS  (2s)
+[34/34] zipper                   FAIL  (22s)  …1 failed in 0.16s
+
+=== qwen3.8-27b-nothink_baseline: pass@1 = 10/34 = 29.4%  (whole-file, single-attempt, python subset)
+    wall=770s
+    wrote /home/will/git/wsl-llm/bench/results/legion-qwen38/quality/nothink_baseline.json

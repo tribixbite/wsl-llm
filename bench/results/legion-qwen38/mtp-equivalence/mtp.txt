@@ -1,0 +1,43 @@
+```python
+def merge_sorted_lists(list1, list2):
+    merged = []
+    i, j = 0, 0
+    while i < len(list1) and j < len(list2):
+        if list1[i] <= list2[j]:
+            merged.append(list1[i])
+            i += 1
+        else:
+            merged.append(list2[j])
+            j += 1
+    merged.extend(list1[i:])
+    merged.extend(list2[j:])
+    return merged
+```
+<<<===PROMPT-SEP===>>>
+A B-tree is a self-balancing tree data structure that maintains sorted data and allows searches, sequential access, insertions, and deletions in logarithmic time. It is specifically designed to handle large amounts of data by storing multiple keys and pointers in each node, which minimizes the number of disk I/O operations required. This structure is widely used in database management systems and file systems to efficiently manage indexed data.
+<<<===PROMPT-SEP===>>>
+```typescript
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+```
+<<<===PROMPT-SEP===>>>
+2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37
+<<<===PROMPT-SEP===>>>
+```bash
+find /var/log -type f -exec du -b {} + | sort -rn | head -5
+```
+
+**Explanation:**
+- `find /var/log -type f` — finds all regular files under `/var/log`.
+- `-exec du -b {} +` — runs `du -b` (byte size) on each file, passing as many arguments as possible in one call for efficiency.
+- `sort -rn` — sorts numerically in reverse order (largest first).
+- `head -5` — takes the top 5 lines.
+
+**Alternative (more precise, shows full path and size in human-readable form):**
+
+```bash
+find /var/log -type f -printf '%s %p\n' | sort -rn | head -5
+```
+
+This uses `find`'s built-in `-printf` to output the file size in bytes followed by the path, which is faster and avoids spawning `du` for each file.
