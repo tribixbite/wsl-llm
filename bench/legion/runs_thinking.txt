@@ -1,0 +1,5 @@
+# Thinking-mode accuracy. Qwen3.8 is thinking-first (reasoning_effort defaults
+# to xhigh); an earlier xhigh run cost ~220 s/exercise (~2 h), so we use
+# 'medium' to keep it tractable. MTP is on because the pooled A/B showed no
+# significant quality effect (20.6% vs 17.6%, p=0.59) and it is ~1.9x faster.
+think_med_mtp|-c 32768 -ctk q8_0 -ctv q8_0 --parallel 1 --reasoning-effort medium --spec-type draft-mtp -md /home/will/models/Qwen3.8-27B-GGUF/MTP/mtp-Qwen3.8-27B-Q4_0.gguf|--think

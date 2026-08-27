@@ -1,5 +1,37 @@
 # WSL LLM Project - Claude Instructions
 
+## ⚠️ This repo now covers TWO machines — check which one you are on first
+
+```bash
+nvidia-smi --query-gpu=name,compute_cap --format=csv,noheader
+```
+
+| Reports | Machine | Notes |
+|---|---|---|
+| `RTX 3090`, `8.6` (×2) | **Desktop** (`matilda`) | Everything below the next section describes this box |
+| `RTX 5080 Laptop`, `12.0` | **Legion laptop** (`will`) | See `docs/QWEN38_27B_LEGION_BENCHMARKS.md` — the sections below mostly DO NOT apply |
+
+### Legion RTX 5080 Laptop quick reference (16 GB, Blackwell sm_120)
+
+- Model: `~/models/Qwen3.8-27B-GGUF/Qwen3.8-27B-UD-Q3_K_XL.gguf` (12.24 GiB, arch `qwen35`)
+- Engine: **mainline llama.cpp** at `~/llama.cpp/build/bin/` — no fork needed, unlike Qwen3.6 on the desktop
+- Build with `-DCMAKE_CUDA_ARCHITECTURES=120` and **CUDA 12.8** (12.6 has no sm_120); cmake auto-promotes to `120a`
+- **`--parallel 1` is MANDATORY.** The default of 4 slots pushes VRAM to 15.9 GiB, and WSL2 has no OOM
+  guardrail — WDDM silently evicts the model to system RAM and decode collapses ~700× (39.8 → 0.04 t/s).
+  Keep peak VRAM ≤ ~14.7 GiB and validate every config with a *timed generation*, never just "it loaded".
+- **Use the MTP draft head** (`MTP/mtp-Qwen3.8-27B-Q4_0.gguf`): 1.89× overall, 2.14× on code,
+  with no measurable accuracy cost (n=102/arm, p=0.59). n-gram speculation gives nothing here.
+- **Keep CUDA graphs ON** (+20%); llama.cpp#27330's laptop-Blackwell hang did not reproduce.
+- **Power mode matters enormously.** Fn+Q → Performance takes the GPU from ~90 W to 175 W:
+  +32% decode, +42% prefill, and the memory clock stops throttling 14001 → 9001 MHz.
+  `nvidia-smi -pl` cannot set it; it is a Windows-side/Lenovo setting.
+- Sampling for Qwen3.8 differs from Qwen3.6: **thinking** temp 1.0 / top_p 0.95;
+  **non-thinking** temp 0.7 / top_p 0.80 / presence_penalty 1.5. `reasoning_effort` is
+  `xhigh` (default) | `medium` | `low` — `xhigh` costs ~220 s/exercise, use `medium`.
+- vLLM/SGLang are **not usable** for this model here: every 4-bit safetensors quant is 17.7–21.8 GiB.
+
+---
+
 ## Project Location
 - **Repo**: `~/git/wsl-llm` (WSL Ubuntu-22.04, user `matilda`)
 - **Models**: `~/models/` (native Linux FS)

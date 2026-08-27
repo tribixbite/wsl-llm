@@ -17,3 +17,22 @@
 [17/34] phone-number             FAIL  (20s)  …1 failed in 0.17s
 [18/34] pig-latin                PASS  (14s)
 [19/34] poker                    FAIL  (33s)  …1 failed, 4 passed in 0.17s
+[20/34] pov                      FAIL  (78s)  …1 error in 0.25s
+[21/34] proverb                  PASS  (4s)
+[22/34] react                    FAIL  (30s)  …1 failed, 1 passed in 0.17s
+[23/34] rest-api                 FAIL  (20s)  …1 failed in 0.19s
+[24/34] robot-name               PASS  (4s)
+[25/34] scale-generator          FAIL  (78s)  …1 error in 0.24s
+[26/34] sgf-parsing              FAIL  (74s)  …1 failed in 0.18s
+[27/34] simple-linked-list       PASS  (11s)
+[28/34] transpose                FAIL  (17s)  …1 failed, 1 passed in 0.22s
+[29/34] tree-building            FAIL  (14s)  …1 failed, 1 passed in 0.16s
+[30/34] two-bucket               FAIL  (29s)  …1 error in 0.26s
+[31/34] variable-length-quantity FAIL  (13s)  …1 failed in 0.17s
+[32/34] wordy                    FAIL  (28s)  …1 failed, 15 passed in 0.18s
+[33/34] zebra-puzzle             FAIL  (1s)  …1 failed, 1 passed in 0.15s
+[34/34] zipper                   FAIL  (19s)  …1 failed, 1 passed in 0.16s
+
+=== qwen3.8-27b-nothink_baseline_r2: pass@1 = 6/34 = 17.6%  (whole-file, single-attempt, python subset)
+    wall=874s
+    wrote /home/will/git/wsl-llm/bench/results/legion-qwen38/quality/nothink_baseline_r2.json
