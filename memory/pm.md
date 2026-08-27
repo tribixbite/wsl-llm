@@ -76,6 +76,59 @@ whole block then engine B's, because the power cap drifts.
 - [ ] Serving scripts/config for the winning stack
 - [ ] Capture hard-won lessons (Blackwell build flags, WSL2 traps) per global CLAUDE.md
 
+## ⚠️ THE BIG ONE — `--parallel` default silently destroys performance on this box
+
+`llama-server` defaults to **`--parallel 4`**. On this hybrid arch every slot gets its own
+DeltaNet recurrent state + compute buffers, so the same `-c 32768 -ctk q8_0` config costs:
+
+| slots | peak VRAM | decode |
+|---|---:|---:|
+| 4 (default) | **15,941 MiB** of 16,303 | **0.04 t/s** ← evicted |
+| 1 (`--parallel 1`) | 13,384 MiB | 27.0 t/s |
+
+At 15.9 GiB we cross the VRAM ceiling and **WDDM silently evicts the model to system RAM
+instead of raising OOM**. Measured VRAM trace: `13376 → 15941 → 2910 MiB` while
+`/health` still returned `{"status":"ok"}`. Decode collapsed to 0.04 t/s (a ~700× cliff),
+prompt eval to 0.28 t/s, and the server died ~100 s later.
+
+**Rules for this machine:**
+1. Always pass `--parallel 1` unless concurrency is actually needed.
+2. Keep peak VRAM ≤ ~14.5 GiB (≥1.5 GiB slack). WSL2 ignores NVIDIA's
+   "Prefer No Sysmem Fallback" setting ([WSL#11050](https://github.com/microsoft/WSL/issues/11050), closed stale),
+   so there is **no OOM guardrail** — you get a 100–700× slowdown instead of an error.
+3. Never trust "it loaded". Validate every config with a timed generation;
+   `bench/legion/find_max_context.sh` does this automatically (`SPILL_THRESHOLD_TPS`).
+
+## Measured: context fit (all with `--parallel 1`, `-fa on`, CUDA graphs ON)
+
+| ctx | KV | peak VRAM | decode | verdict |
+|---:|---|---:|---:|---|
+| 8192 | q8_0 | 12,458 MiB | 27.18 | OK |
+| 16384 | q8_0 | 12,760 MiB | 26.69 | OK |
+| 24576 | q8_0 | 13,072 MiB | 26.10 | OK |
+| 32768 | q8_0 | 13,384 MiB | 27.02 | OK |
+| 32768 | q4_0 | 12,816 MiB | 26.54 | OK |
+| 49152 | q4_0 | 13,176 MiB | 27.13 | OK |
+| 65536 | q4_0 | 13,536 MiB | 27.33 | OK |
+
+**Context is not the constraint.** Decode is flat 8k→64k (27.18 → 27.33 t/s) because only
+16 of 64 layers hold a growing KV cache. 64k costs ~13.5 GiB, leaving ~2.4 GiB slack.
+
+## Measured: other levers
+- **CUDA graphs ON = +20%** (30.74 vs 25.55 t/s, llama-bench). **No Xid 8 hang observed**,
+  contrary to llama.cpp#27330 (which is reported on RTX 5090 Laptop). Keep graphs ON here.
+- llama-bench @ small ctx: **pp512 = 949.9 t/s, tg128 = 30.7 t/s**, peak 12,600 MiB.
+- Peak power *draw* hit **110.3 W against a 95 W cap** at only **56 °C** — Dynamic Boost
+  overshoots transiently; we are power-limited, never thermally limited.
+- **Verified independently**: the GGUF contains **24 tensors in 2-bit classes totalling
+  2,002,780,160 params = 7.33%** of the model (IQ2_S×15, IQ2_XS×4, Q2_K×3, IQ2_XXS×2).
+  This confirms the community complaint about Unsloth's Dynamic-V3 rebuild. Revision
+  `408fcc18` (12.52 GiB) reportedly has zero 2-bit tensors — worth a quality head-to-head.
+- Windows interop works from WSL (`powershell.exe`, `nvidia-smi.exe`). Windows-side
+  `nvidia-smi.exe` confirms `power.max_limit = 175 W`. Power plan is **Balanced**.
+  Lenovo `LENOVO_GAMEZONE_DATA` WMI returns **Access denied** unelevated → the Fn+Q
+  Performance switch must be done by the user.
+
 ## Verified model architecture (read from the GGUF + upstream `config.json`, not from memory)
 
 `Qwen/Qwen3.8-27B` → `model_type: qwen3_5`, `Qwen3_5ForConditionalGeneration`.

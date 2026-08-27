@@ -1,0 +1,4 @@
+[baseline_32k_q8kv/prose] decode=39.92 t/s  ttft=371ms  tokens=800  wall=20.41s
+[baseline_32k_q8kv/code] decode=39.80 t/s  ttft=378ms  tokens=800  wall=20.48s
+[baseline_32k_q8kv/json] decode=39.72 t/s  ttft=410ms  tokens=800  wall=20.55s
+[baseline_32k_q8kv] AVG decode = 39.81 t/s over 3 prompts

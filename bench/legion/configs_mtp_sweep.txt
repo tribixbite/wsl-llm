@@ -1,0 +1,8 @@
+# MTP speculative decoding x context/KV sweep.
+# MTP costs ~1.83 GiB of VRAM (15216 vs 13388 MiB at 32k/q8_0), leaving only
+# ~1.1 GiB slack. On WSL2 there is no OOM guardrail, so we need to find the
+# largest context that keeps MTP resident with safe margin.
+mtp_16k_q8kv|-c 16384 -ctk q8_0 -ctv q8_0 --parallel 1 --spec-type draft-mtp -md /home/will/models/Qwen3.8-27B-GGUF/MTP/mtp-Qwen3.8-27B-Q4_0.gguf
+mtp_32k_q4kv|-c 32768 -ctk q4_0 -ctv q4_0 --parallel 1 --spec-type draft-mtp -md /home/will/models/Qwen3.8-27B-GGUF/MTP/mtp-Qwen3.8-27B-Q4_0.gguf
+mtp_64k_q8k_q4v|-c 65536 -ctk q8_0 -ctv q4_0 --parallel 1 --spec-type draft-mtp -md /home/will/models/Qwen3.8-27B-GGUF/MTP/mtp-Qwen3.8-27B-Q4_0.gguf
+mtp_64k_q4kv|-c 65536 -ctk q4_0 -ctv q4_0 --parallel 1 --spec-type draft-mtp -md /home/will/models/Qwen3.8-27B-GGUF/MTP/mtp-Qwen3.8-27B-Q4_0.gguf

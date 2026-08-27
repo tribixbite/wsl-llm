@@ -1,0 +1,4 @@
+[ngramsimple_32k_q8kv/prose] decode=39.65 t/s  ttft=359ms  tokens=800  wall=20.54s
+[ngramsimple_32k_q8kv/code] decode=39.01 t/s  ttft=377ms  tokens=800  wall=20.88s
+[ngramsimple_32k_q8kv/json] decode=38.18 t/s  ttft=389ms  tokens=800  wall=21.34s
+[ngramsimple_32k_q8kv] AVG decode = 38.95 t/s over 3 prompts
