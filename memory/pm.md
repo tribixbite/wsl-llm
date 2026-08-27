@@ -6,7 +6,7 @@
 - Driver 610.57.01, CUDA UMD 13.3; toolkits `/usr/local/cuda-12.6`, `/usr/local/cuda-12.8`
 - WSL2 Ubuntu 22.04 (kernel 5.15). Native Windows 11 available as an alternative.
 - Disk: 91 GB free on `/`, 309 GB free on `/mnt/c`
-- ⚠️ `nvidia-smi` reports power cap **95 W / 95 W** (RTX 5080 Laptop can be up to ~175 W) — investigate power mode.
+- ✅ Power cap RESOLVED: Fn+Q → Performance = **175 W** (was ~90 W). Survives reboot. Worth +32% decode / +42% prefill.
 - Tooling present: git, cmake, gcc, nvcc(12.8), python3.10, uv, hf, bun. **Missing: docker, aria2c.**
 
 **Goal:** best accuracy + tok/s + agentic coding score for `unsloth/Qwen3.8-27B-GGUF` on this box.
@@ -21,19 +21,19 @@ Benchmark llama.cpp vs vLLM vs other engines found by research. Consider native 
 - [x] Start download of `Qwen3.8-27B-UD-Q3_K_XL.gguf` (12.24 GiB) + `mtp-Qwen3.8-27B-Q4_0.gguf` (1.28 GiB)
 - [x] **Download complete** — both files present and whole (13,146,393,504 B + 1,369,590,656 B, no `.incomplete`)
 
-### Phase 1 — research (subagents, in flight)
-- [ ] A: Qwen3.8-27B model facts — arch, thinking mode, sampling params, published agentic/coding scores, quant sizing, engine support matrix
-- [ ] B: Blackwell sm_120 engine landscape — llama.cpp / vLLM / SGLang / TensorRT-LLM / ExLlamaV3 / MLC / ik_llama; WSL2 vs native Windows; sysmem-fallback trap; laptop TGP & bandwidth ceiling; KV-cache strategy for 16 GB
+### Phase 1 — research (done)
+- [x] A: Qwen3.8-27B model facts — arch, thinking mode, sampling params, published agentic/coding scores, quant sizing, engine support matrix
+- [x] B: Blackwell sm_120 engine landscape — llama.cpp / vLLM / SGLang / TensorRT-LLM / ExLlamaV3 / MLC / ik_llama; WSL2 vs native Windows; sysmem-fallback trap; laptop TGP & bandwidth ceiling; KV-cache strategy for 16 GB
 - [x] C: Agentic-coding benchmark harnesses runnable locally; reuse of existing `bench/` runners; quantization-damage measurement (KL-divergence); fair engine-vs-engine methodology — **done, see "Benchmark-research findings" below + Phase 3 plan**
-- [ ] Reconcile the three reports; resolve conflicts; pick the candidate stack list
+- [x] Reconcile the three reports; resolve conflicts; pick the candidate stack list
 
 ### Phase 2 — environment
-- [ ] Fix GPU power cap / Legion power mode if it is limiting us
-- [ ] Verify CUDA sysmem-fallback is OFF (silent VRAM→RAM spill destroys throughput on WDDM)
-- [ ] Build llama.cpp for sm_120 (`CMAKE_CUDA_ARCHITECTURES=120`, CUDA 12.8)
-- [ ] Set up vLLM (venv, Blackwell-capable torch/wheel)
-- [ ] Set up whatever additional engines research recommends
-- [ ] Record a memory-bandwidth-derived theoretical decode ceiling as the benchmark target
+- [x] Fix GPU power cap / Legion power mode if it is limiting us
+- [x] Verify CUDA sysmem-fallback is OFF (silent VRAM→RAM spill destroys throughput on WDDM)
+- [x] Build llama.cpp for sm_120 (`CMAKE_CUDA_ARCHITECTURES=120`, CUDA 12.8)
+- [x] ~~Set up vLLM~~ — ABANDONED: no 4-bit safetensors quant fits 16 GB (smallest 17.69 GiB)
+- [x] Set up whatever additional engines research recommends
+- [x] Record a memory-bandwidth-derived theoretical decode ceiling as the benchmark target
 
 ### Phase 3 — benchmarks (plan finalised by research subagent C, 2026-08-27)
 
@@ -41,17 +41,17 @@ Benchmark llama.cpp vs vLLM vs other engines found by research. Consider native 
 - [ ] `test-chat-auto-parser <gguf>` — confirm llama.cpp derives a tool-call parser from the embedded template
 - [ ] `GET /props` → assert `chat_template_caps.supports_tools` / `supports_tool_calls`
 - [ ] Greedy-diff sanity: 10 fixed prompts, temp 0, Q3_K_XL vs Q8_0 — catches a broken quant in minutes
-- [ ] Record `enforced.power.limit` — it drifts (65 W ↔ 90 W observed); every run must log it
+- [x] Record `enforced.power.limit` — it drifts (65 W ↔ 90 W observed); every run must log it
 
 **Tier 1 — speed (~30 min/engine)**
 - [ ] `llama-benchy` depth sweep `--depth 0 4096 16384 65536 --exact-tg --no-cache` (works on every OpenAI endpoint)
-- [ ] Reuse `bench/stream_bench.py` for the house decode_TPS/TTFT number (comparable to the 3090 results)
+- [x] Reuse `bench/stream_bench.py` for the house decode_TPS/TTFT number (comparable to the 3090 results)
 - [ ] `llama-bench -d 0,4096,16384,65536` for the engine-internal prefill/decode split (llama.cpp only)
-- [ ] MTP / speculative on vs off: `--spec-type draft-mtp -md MTP/mtp-Qwen3.8-27B-Q4_0.gguf` (costs 1.37 GiB of KV budget)
-- [ ] KV-cache quant sweep (f16 / q8_0 / q4_0) → max usable context
+- [x] MTP / speculative on vs off: `--spec-type draft-mtp -md MTP/mtp-Qwen3.8-27B-Q4_0.gguf` (costs 1.37 GiB of KV budget)
+- [x] KV-cache quant sweep (f16 / q8_0 / q4_0) → max usable context
 
 **Tier 2 — quality (~2-4 h)**
-- [ ] `bench/aider_lite.py` — 34 python exercises, directly comparable to the existing 27B/35B/coder-30B numbers
+- [x] `bench/aider_lite.py` — 34 python exercises, directly comparable to the existing 27B/35B/coder-30B numbers
 - [ ] Official aider polyglot, host-native via `AIDER_DOCKER=1`, `--languages python,go,rust`
 - [ ] Tool-calling: `scripts/tool_bench.py` + `DEBUG_EXTERNAL=1 tests.sh unit/test_tool_call.py`
 - [ ] KL-divergence vs **Q8_0** baseline (BF16 = 54.7 GB, won't fit) — **`--chunks 200` is mandatory**:
@@ -62,7 +62,7 @@ Benchmark llama.cpp vs vLLM vs other engines found by research. Consider native 
 - [ ] mini-swe-agent on `swe-bench-verified-mini` (50 inst) via `MSWEA_DOCKER_EXECUTABLE=podman`; grade with `sb-cli`
 - [ ] Quant ladder: UD-Q3_K_XL vs UD-IQ4_XS vs UD-Q4_K_S on the tier-2 suite
 - [ ] LiveCodeBench v6 date-sliced (`--start_date 2025-01-01`) if a runner is stood up
-- [ ] WSL2 vs native Windows head-to-head (if research says the delta is material)
+- [x] WSL2 vs native Windows head-to-head (if research says the delta is material)
 
 **Fair-comparison invariants** (must be identical across engines or the numbers are meaningless):
 sampling (temp/top_p/top_k/min_p), seed, prompt set, context length, thinking on/off,
@@ -71,10 +71,10 @@ KV dtype, flash-attn, batch/slots, warmup count, speculative on/off, and `--igno
 whole block then engine B's, because the power cap drifts.
 
 ### Phase 4 — deliverables
-- [ ] `docs/QWEN38_27B_LEGION_BENCHMARKS.md` — full report in house style
-- [ ] Update `CLAUDE.md` to cover BOTH machines (desktop 2×3090 and this Legion)
-- [ ] Serving scripts/config for the winning stack
-- [ ] Capture hard-won lessons (Blackwell build flags, WSL2 traps) per global CLAUDE.md
+- [x] `docs/QWEN38_27B_LEGION_BENCHMARKS.md` — full report in house style
+- [x] Update `CLAUDE.md` to cover BOTH machines (desktop 2×3090 and this Legion)
+- [x] Serving scripts/config for the winning stack
+- [x] Capture hard-won lessons (Blackwell build flags, WSL2 traps) per global CLAUDE.md
 
 ## ⚠️ THE BIG ONE — `--parallel` default silently destroys performance on this box
 
