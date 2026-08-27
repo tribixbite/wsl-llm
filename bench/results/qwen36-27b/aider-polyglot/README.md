@@ -115,15 +115,25 @@ convergence first (affine-cipher: `finish_reason: stop`, real code emitted).
 discipline.** Naive thinking-ON *hurt* (spiral/truncation); forced-budget thinking
 *helped* and nearly catches the thinking-OFF 27B Dense (12/34 = 35.3%).
 
-### Four-way summary (single-attempt, whole-file, 34 python exercises)
+### Five-way summary (single-attempt, whole-file, 34 python exercises)
 
 | Model / mode | pass@1 |
 |---|---:|
-| Qwen3.6-27B Dense, thinking OFF | **12/34 = 35.3%** |
+| **Qwen3.6-27B Dense, forced-budget thinking (6k<14k)** | **13/34 = 38.2%** ← best |
+| Qwen3.6-27B Dense, thinking OFF | 12/34 = 35.3% |
 | Qwen3.6-35B-A3B, forced-budget thinking | 11/34 = 32.4% |
 | Qwen3.6-35B-A3B, thinking OFF | 8/34 = 23.5% |
 | Qwen3-Coder-30B-A3B, thinking OFF | 8/34 = 23.5% |
 | Qwen3.6-35B-A3B, naive thinking | 7/34 = 20.6% |
+
+**The 27B Dense + forced-budget thinking is the champion (13/34 = 38.2%).** Thinking
+helped the 27B too (+1 over its thinking-OFF 12/34), a smaller lift than the 35B's +3
+— the all-active dense model was already strong and far less prone to the MoE
+overthinking spiral. Confirms both theses at once: (1) active-param count dominates
+hard coding, (2) forced-budget thinking is a real, safe quality lever on top. The 27B
+thinking run survived a mid-run WSL restart at 27/34 thanks to incremental JSONL
+persistence (7 remaining exercises re-run and merged; tail scored 5/7). Raw:
+`aider_27b_think6k_combined.json`.
 
 **Operational recommendation:** if you want thinking on the 35B-A3B, set
 `REASONING_BUDGET` to ~6000 (NOT 0 and NOT ≥ your max_tokens) and keep max_tokens

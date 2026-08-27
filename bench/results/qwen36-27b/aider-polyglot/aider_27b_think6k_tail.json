@@ -1,0 +1,42 @@
+{
+  "model": "qwen3.6-27b",
+  "pass": 5,
+  "n": 7,
+  "results": [
+    {
+      "name": "transpose",
+      "pass": true,
+      "gen_s": 293.1
+    },
+    {
+      "name": "tree-building",
+      "pass": false,
+      "gen_s": 324.4
+    },
+    {
+      "name": "two-bucket",
+      "pass": true,
+      "gen_s": 330.6
+    },
+    {
+      "name": "variable-length-quantity",
+      "pass": true,
+      "gen_s": 319.3
+    },
+    {
+      "name": "wordy",
+      "pass": false,
+      "gen_s": 324.4
+    },
+    {
+      "name": "zebra-puzzle",
+      "pass": true,
+      "gen_s": 370.3
+    },
+    {
+      "name": "zipper",
+      "pass": true,
+      "gen_s": 331.4
+    }
+  ]
+}

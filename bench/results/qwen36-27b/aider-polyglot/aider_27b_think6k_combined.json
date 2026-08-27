@@ -1,0 +1,143 @@
+{
+  "model": "qwen3.6-27b-think6k",
+  "pass": 13,
+  "n": 34,
+  "results": [
+    {
+      "name": "affine-cipher",
+      "pass": true
+    },
+    {
+      "name": "beer-song",
+      "pass": false
+    },
+    {
+      "name": "book-store",
+      "pass": false
+    },
+    {
+      "name": "bottle-song",
+      "pass": false
+    },
+    {
+      "name": "bowling",
+      "pass": false
+    },
+    {
+      "name": "connect",
+      "pass": true
+    },
+    {
+      "name": "dominoes",
+      "pass": true
+    },
+    {
+      "name": "dot-dsl",
+      "pass": false
+    },
+    {
+      "name": "food-chain",
+      "pass": false
+    },
+    {
+      "name": "forth",
+      "pass": false
+    },
+    {
+      "name": "go-counting",
+      "pass": false
+    },
+    {
+      "name": "grade-school",
+      "pass": true
+    },
+    {
+      "name": "grep",
+      "pass": false
+    },
+    {
+      "name": "hangman",
+      "pass": false
+    },
+    {
+      "name": "list-ops",
+      "pass": false
+    },
+    {
+      "name": "paasio",
+      "pass": false
+    },
+    {
+      "name": "phone-number",
+      "pass": false
+    },
+    {
+      "name": "pig-latin",
+      "pass": true
+    },
+    {
+      "name": "poker",
+      "pass": false
+    },
+    {
+      "name": "pov",
+      "pass": false
+    },
+    {
+      "name": "proverb",
+      "pass": true
+    },
+    {
+      "name": "react",
+      "pass": true
+    },
+    {
+      "name": "rest-api",
+      "pass": false
+    },
+    {
+      "name": "robot-name",
+      "pass": true
+    },
+    {
+      "name": "scale-generator",
+      "pass": false
+    },
+    {
+      "name": "sgf-parsing",
+      "pass": false
+    },
+    {
+      "name": "simple-linked-list",
+      "pass": false
+    },
+    {
+      "name": "transpose",
+      "pass": true
+    },
+    {
+      "name": "tree-building",
+      "pass": false
+    },
+    {
+      "name": "two-bucket",
+      "pass": true
+    },
+    {
+      "name": "variable-length-quantity",
+      "pass": true
+    },
+    {
+      "name": "wordy",
+      "pass": false
+    },
+    {
+      "name": "zebra-puzzle",
+      "pass": true
+    },
+    {
+      "name": "zipper",
+      "pass": true
+    }
+  ]
+}
