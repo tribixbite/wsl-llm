@@ -3,3 +3,7 @@
 {"name": "paasio", "pass": false, "pass1": false, "pass2": false, "gen_s": 138.2}
 {"name": "phone-number", "pass": false, "pass1": false, "pass2": false, "gen_s": 77.4}
 {"name": "pig-latin", "pass": true, "pass1": true, "pass2": true, "gen_s": 109.0}
+{"name": "poker", "pass": true, "pass1": false, "pass2": true, "gen_s": 148.3}
+{"name": "pov", "pass": false, "pass1": false, "pass2": false, "gen_s": 157.8}
+{"name": "proverb", "pass": true, "pass1": false, "pass2": true, "gen_s": 59.7}
+{"name": "react", "pass": false, "pass1": false, "pass2": false, "gen_s": 230.8}
