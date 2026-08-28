@@ -20,3 +20,14 @@
 {"name": "pov", "pass": false, "pass1": false, "pass2": false, "gen_s": 122.6}
 {"name": "proverb", "pass": true, "pass1": false, "pass2": true, "gen_s": 15.6}
 {"name": "react", "pass": false, "pass1": false, "pass2": false, "gen_s": 44.5}
+{"name": "rest-api", "pass": false, "pass1": false, "pass2": false, "gen_s": 77.6}
+{"name": "robot-name", "pass": true, "pass1": true, "pass2": true, "gen_s": 4.7}
+{"name": "scale-generator", "pass": false, "pass1": false, "pass2": false, "gen_s": 62.3}
+{"name": "sgf-parsing", "pass": false, "pass1": false, "pass2": false, "gen_s": 79.0}
+{"name": "simple-linked-list", "pass": true, "pass1": true, "pass2": true, "gen_s": 12.5}
+{"name": "transpose", "pass": false, "pass1": false, "pass2": false, "gen_s": 19.4}
+{"name": "tree-building", "pass": false, "pass1": false, "pass2": false, "gen_s": 38.9}
+{"name": "two-bucket", "pass": true, "pass1": true, "pass2": true, "gen_s": 27.9}
+{"name": "variable-length-quantity", "pass": true, "pass1": true, "pass2": true, "gen_s": 12.2}
+{"name": "wordy", "pass": false, "pass1": false, "pass2": false, "gen_s": 50.9}
+{"name": "zebra-puzzle", "pass": true, "pass1": false, "pass2": true, "gen_s": 3.2}
