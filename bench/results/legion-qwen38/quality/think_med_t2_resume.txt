@@ -14,3 +14,4 @@
 [14/21] simple-linked-list       PASS@2  (84s)
 [15/21] transpose                PASS    (197s)
 [16/21] tree-building            FAIL    (185s)  …1 failed, 2 passed in 0.15s
+[17/21] two-bucket               PASS    (132s)
