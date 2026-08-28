@@ -157,6 +157,35 @@ point** — matching the independent note in `CLAUDE.md` from the Legion machine
 ("`xhigh` costs ~220 s/exercise, use `medium`"). Raw (partial):
 `aider_q38_q6_effort_xhigh.json`.
 
+## vLLM stack (`syv-ai/qwen38-27b-rtx3090`) — ATTEMPTED, WEDGES ON THIS BOX
+
+Claim: ~114–121 tok/s single-user (MTP), ~127–130 with DFlash2. We got it fully
+installed and loading, then it **wedged before serving a single token**.
+
+**Result: model loaded (22 GB VRAM), port 18020 LISTENING, log says
+`Application startup complete` — but 0% GPU utilization and every HTTP request
+times out (`HTTP:000` at 15 s). EngineCore alive but unresponsive.**
+
+This is the **same failure mode this repo already documented for vLLM on this WSL2
+box** — vLLM 0.17 wedged during the LCB runs, 0.22 during the EAGLE3 test, and now
+0.28. Three versions, three wedges. **vLLM is not reliable on this machine**;
+llama.cpp is the supported path here.
+
+### Install obstacles cleared along the way (all fixed, none was the blocker)
+
+| Obstacle | Fix |
+|---|---|
+| Docker could not select the `nvidia` device driver | `nvidia-container-toolkit` is not installed (root). Switched to the venv path. |
+| Docker `credsStore: desktop.exe` breaks pulls in WSL | removed `credsStore` from `~/.docker/config.json` (backup at `.bak`) |
+| README assumes Python 3.12; venv built 3.10 | patch against `venv/lib/python3.10/site-packages/vllm` |
+| 4/19 patches rejected (written for vLLM 0.27.1, installed 0.28.0) | all 4 are DFlash2/vision; ran MTP n=4 instead |
+| `NameError: name 'envs' is not defined` in `qwen3_vl.py` | the rejected `vision-tower-cpu-offload.patch` applied its *usage* hunks but not the import — added `import vllm.envs as envs` |
+| Docker's prepare ran as root → model tree mode-600 root-owned, unreadable | re-downloaded + requantized into a user-owned `models2/` (no sudo needed) |
+
+Reproduce the working-but-wedging install: venv + `pip install vllm`, apply the 15
+compatible patches, `MODEL=.../models2/Qwen3.8-27B-W4A16-AutoRound bash
+single-user/start_qwen.sh`. If vLLM is ever fixed on this box, that is the command.
+
 ## Not tested here
 
 The `syv-ai/qwen38-27b-rtx3090` vLLM W4A16 stack claims ~114 t/s single-user /
