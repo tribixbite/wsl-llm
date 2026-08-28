@@ -1,0 +1,4 @@
+{"name": "variable-length-quantity", "pass": true, "pass1": true, "pass2": true, "gen_s": 86.3}
+{"name": "wordy", "pass": false, "pass1": false, "pass2": false, "gen_s": 163.4}
+{"name": "zebra-puzzle", "pass": true, "pass1": true, "pass2": true, "gen_s": 181.9}
+{"name": "zipper", "pass": true, "pass1": false, "pass2": true, "gen_s": 112.8}

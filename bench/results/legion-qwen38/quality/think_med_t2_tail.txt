@@ -1,0 +1,10 @@
+[1/4] variable-length-quantity PASS    (86s)
+[2/4] wordy                    FAIL    (163s)  …1 failed, 19 passed in 0.16s
+[3/4] zebra-puzzle             PASS    (182s)
+[4/4] zipper                   PASS@2  (113s)
+
+=== qwen3.8-27b-think_med_t2_tail (whole-file, python subset, tries=2)
+    pass@1 = 2/4 = 50.0%
+    pass@2 = 3/4 = 75.0%   <- aider leaderboard headline metric
+    wall=611s
+    wrote /home/will/git/wsl-llm/bench/results/legion-qwen38/quality/think_med_t2_tail.json
