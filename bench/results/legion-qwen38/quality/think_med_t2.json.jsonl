@@ -4,3 +4,7 @@
 {"name": "bottle-song", "pass": true, "pass1": false, "pass2": true, "gen_s": 64.9}
 {"name": "bowling", "pass": true, "pass1": true, "pass2": true, "gen_s": 261.2}
 {"name": "connect", "pass": false, "pass1": false, "pass2": false, "gen_s": 240.9}
+{"name": "dominoes", "pass": true, "pass1": true, "pass2": true, "gen_s": 121.5}
+{"name": "dot-dsl", "pass": false, "pass1": false, "pass2": false, "gen_s": 107.0}
+{"name": "food-chain", "pass": true, "pass1": false, "pass2": true, "gen_s": 118.5}
+{"name": "forth", "pass": false, "pass1": false, "pass2": false, "gen_s": 154.3}
