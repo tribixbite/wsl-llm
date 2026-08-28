@@ -14,3 +14,5 @@
 {"name": "hangman", "pass": false, "pass1": false, "pass2": false, "gen_s": 0.0}
 {"name": "list-ops", "pass": false, "pass1": false, "pass2": false, "gen_s": 0.0}
 {"name": "paasio", "pass": false, "pass1": false, "pass2": false, "gen_s": 0.0}
+{"name": "phone-number", "pass": false, "pass1": false, "pass2": false, "gen_s": 0.0}
+{"name": "pig-latin", "pass": false, "pass1": false, "pass2": false, "gen_s": 0.0}
