@@ -1,0 +1,248 @@
+{
+  "model": "exl3-3.0bpw",
+  "tries": 2,
+  "n": 34,
+  "pass": 13,
+  "pass1": 5,
+  "pass2": 13,
+  "results": [
+    {
+      "name": "affine-cipher",
+      "pass": true,
+      "pass1": true,
+      "pass2": true,
+      "gen_s": 11.4
+    },
+    {
+      "name": "beer-song",
+      "pass": false,
+      "pass1": false,
+      "pass2": false,
+      "gen_s": 19.4
+    },
+    {
+      "name": "book-store",
+      "pass": false,
+      "pass1": false,
+      "pass2": false,
+      "gen_s": 90.7
+    },
+    {
+      "name": "bottle-song",
+      "pass": true,
+      "pass1": false,
+      "pass2": true,
+      "gen_s": 24.0
+    },
+    {
+      "name": "bowling",
+      "pass": false,
+      "pass1": false,
+      "pass2": false,
+      "gen_s": 57.9
+    },
+    {
+      "name": "connect",
+      "pass": false,
+      "pass1": false,
+      "pass2": false,
+      "gen_s": 38.3
+    },
+    {
+      "name": "dominoes",
+      "pass": true,
+      "pass1": false,
+      "pass2": true,
+      "gen_s": 55.3
+    },
+    {
+      "name": "dot-dsl",
+      "pass": false,
+      "pass1": false,
+      "pass2": false,
+      "gen_s": 30.5
+    },
+    {
+      "name": "food-chain",
+      "pass": false,
+      "pass1": false,
+      "pass2": false,
+      "gen_s": 19.1
+    },
+    {
+      "name": "forth",
+      "pass": false,
+      "pass1": false,
+      "pass2": false,
+      "gen_s": 74.0
+    },
+    {
+      "name": "go-counting",
+      "pass": false,
+      "pass1": false,
+      "pass2": false,
+      "gen_s": 48.1
+    },
+    {
+      "name": "grade-school",
+      "pass": false,
+      "pass1": false,
+      "pass2": false,
+      "gen_s": 10.8
+    },
+    {
+      "name": "grep",
+      "pass": false,
+      "pass1": false,
+      "pass2": false,
+      "gen_s": 22.3
+    },
+    {
+      "name": "hangman",
+      "pass": false,
+      "pass1": false,
+      "pass2": false,
+      "gen_s": 16.1
+    },
+    {
+      "name": "list-ops",
+      "pass": false,
+      "pass1": false,
+      "pass2": false,
+      "gen_s": 12.9
+    },
+    {
+      "name": "paasio",
+      "pass": false,
+      "pass1": false,
+      "pass2": false,
+      "gen_s": 30.4
+    },
+    {
+      "name": "phone-number",
+      "pass": false,
+      "pass1": false,
+      "pass2": false,
+      "gen_s": 29.9
+    },
+    {
+      "name": "pig-latin",
+      "pass": true,
+      "pass1": false,
+      "pass2": true,
+      "gen_s": 18.0
+    },
+    {
+      "name": "poker",
+      "pass": false,
+      "pass1": false,
+      "pass2": false,
+      "gen_s": 53.1
+    },
+    {
+      "name": "pov",
+      "pass": false,
+      "pass1": false,
+      "pass2": false,
+      "gen_s": 52.5
+    },
+    {
+      "name": "proverb",
+      "pass": true,
+      "pass1": false,
+      "pass2": true,
+      "gen_s": 10.6
+    },
+    {
+      "name": "react",
+      "pass": false,
+      "pass1": false,
+      "pass2": false,
+      "gen_s": 17.5
+    },
+    {
+      "name": "rest-api",
+      "pass": false,
+      "pass1": false,
+      "pass2": false,
+      "gen_s": 34.8
+    },
+    {
+      "name": "robot-name",
+      "pass": true,
+      "pass1": true,
+      "pass2": true,
+      "gen_s": 3.3
+    },
+    {
+      "name": "scale-generator",
+      "pass": true,
+      "pass1": false,
+      "pass2": true,
+      "gen_s": 77.4
+    },
+    {
+      "name": "sgf-parsing",
+      "pass": false,
+      "pass1": false,
+      "pass2": false,
+      "gen_s": 53.8
+    },
+    {
+      "name": "simple-linked-list",
+      "pass": true,
+      "pass1": true,
+      "pass2": true,
+      "gen_s": 9.8
+    },
+    {
+      "name": "transpose",
+      "pass": true,
+      "pass1": false,
+      "pass2": true,
+      "gen_s": 54.7
+    },
+    {
+      "name": "tree-building",
+      "pass": false,
+      "pass1": false,
+      "pass2": false,
+      "gen_s": 19.8
+    },
+    {
+      "name": "two-bucket",
+      "pass": true,
+      "pass1": true,
+      "pass2": true,
+      "gen_s": 21.0
+    },
+    {
+      "name": "variable-length-quantity",
+      "pass": true,
+      "pass1": true,
+      "pass2": true,
+      "gen_s": 13.4
+    },
+    {
+      "name": "wordy",
+      "pass": false,
+      "pass1": false,
+      "pass2": false,
+      "gen_s": 49.5
+    },
+    {
+      "name": "zebra-puzzle",
+      "pass": true,
+      "pass1": false,
+      "pass2": true,
+      "gen_s": 2.7
+    },
+    {
+      "name": "zipper",
+      "pass": true,
+      "pass1": false,
+      "pass2": true,
+      "gen_s": 31.9
+    }
+  ]
+}

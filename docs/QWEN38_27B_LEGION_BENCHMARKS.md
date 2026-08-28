@@ -467,3 +467,31 @@ byte-identical between the two (sha1 `a7e79f8fe37f381c`), ruling that out as a c
 
 The 408 revision was also markedly more verbose — on `rust/forth` it failed to converge within
 35 minutes where V3 finished the same exercise in 232 s (both failing the tests).
+
+
+---
+
+## 13. ExLlamaV3 vs llama.cpp on quality — a dead heat
+
+Speed alone does not decide an engine. Both were scored with the **same harness**
+(`bench/aider_lite.py --tries 2`, non-thinking, 34 Python exercises) by putting a minimal
+OpenAI-compatible shim over ExLlamaV3 (`bench/legion/exl3_server.py`) so the comparison is
+apples-to-apples rather than "speed from one tool, quality from another".
+
+| engine | quant | size | decode | pass@1 | **pass@2** |
+|---|---|---:|---:|---:|---:|
+| llama.cpp | GGUF UD-Q3_K_XL | 12.24 GiB | 39.8 t/s | 17.6% | **38.2%** (13/34) |
+| ExLlamaV3 | EXL3 3.0bpw | 12.53 GiB | 44.1 t/s | 14.7% | **38.2%** (13/34) |
+| **llama.cpp + MTP** | GGUF UD-Q3_K_XL | +1.28 GiB | **75.3 t/s** | — | — |
+
+**Identical pass@2 (13/34 both).** At matched size and settings the two quant formats and
+engines deliver equivalent quality on this benchmark, so the decision is purely throughput and
+operational fit:
+
+- ExLlamaV3 is ~11% faster than llama.cpp's *baseline*…
+- …but **llama.cpp + MTP is ~70% faster than ExLlamaV3**, because there is no EXL3 MTP draft head.
+- ExLlamaV3 is Windows-only here (open sm_120 WSL2 bug), needs `setuptools` + `triton-windows`
+  to import at all, and has the same `max_batch_size` VRAM trap.
+
+**Verdict: llama.cpp + MTP.** ExLlamaV3 is a credible engine on this hardware and worth
+revisiting if an EXL3 MTP/EAGLE draft appears, but today MTP is decisive.
