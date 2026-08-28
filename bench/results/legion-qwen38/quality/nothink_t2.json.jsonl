@@ -11,3 +11,12 @@
 {"name": "go-counting", "pass": false, "pass1": false, "pass2": false, "gen_s": 69.2}
 {"name": "grade-school", "pass": false, "pass1": false, "pass2": false, "gen_s": 13.7}
 {"name": "grep", "pass": false, "pass1": false, "pass2": false, "gen_s": 35.6}
+{"name": "hangman", "pass": false, "pass1": false, "pass2": false, "gen_s": 23.9}
+{"name": "list-ops", "pass": false, "pass1": false, "pass2": false, "gen_s": 32.5}
+{"name": "paasio", "pass": false, "pass1": false, "pass2": false, "gen_s": 40.1}
+{"name": "phone-number", "pass": false, "pass1": false, "pass2": false, "gen_s": 29.1}
+{"name": "pig-latin", "pass": true, "pass1": false, "pass2": true, "gen_s": 56.4}
+{"name": "poker", "pass": true, "pass1": true, "pass2": true, "gen_s": 42.8}
+{"name": "pov", "pass": false, "pass1": false, "pass2": false, "gen_s": 122.6}
+{"name": "proverb", "pass": true, "pass1": false, "pass2": true, "gen_s": 15.6}
+{"name": "react", "pass": false, "pass1": false, "pass2": false, "gen_s": 44.5}
