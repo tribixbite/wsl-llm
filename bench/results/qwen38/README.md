@@ -117,6 +117,25 @@ the right control surface for this model — not a numeric `REASONING_BUDGET`.
 and `--spec-type draft-mtp`.** MTP recovers most of the speed cost of thinking
 (59 t/s code), so you get both the quality and acceptable throughput.
 
+### `xhigh` is NOT better than `medium` (preliminary)
+
+A sweep at `reasoning_effort=xhigh` (Qwen 3.8's own default) with max_tokens 16000
+ran far slower and scored no better on the overlapping exercises:
+
+| | medium | xhigh |
+|---|---|---|
+| affine-cipher | PASS | PASS (193.8 s) |
+| beer-song | PASS | **FAIL** (108.0 s) |
+| book-store | — | ran >390 s, past the ~16k-token cap |
+| per-exercise cost | ~30–120 s | ~110–220 s+ |
+
+`xhigh` reproduces the **cap-truncation failure mode** documented for the
+Qwen3.6-35B-A3B: on hard problems it reasons past the token budget and never emits
+an answer. Combined with ~2–4× the wall time, **`medium` is the right operating
+point** — matching the independent note in `CLAUDE.md` from the Legion machine
+("`xhigh` costs ~220 s/exercise, use `medium`"). Raw (partial):
+`aider_q38_q6_effort_xhigh.json`.
+
 ## Not tested here
 
 The `syv-ai/qwen38-27b-rtx3090` vLLM W4A16 stack claims ~114 t/s single-user /
