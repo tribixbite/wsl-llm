@@ -1,0 +1,1 @@
+nothink_t2|-c 32768 -ctk q8_0 -ctv q8_0 --parallel 1 --reasoning-budget 0|--cooldown 15 --temp-max 74 --temp-resume 66
