@@ -333,21 +333,22 @@ laptop Blackwell; none occurred here across hours of runs, and graphs are worth 
 
 ---
 
-## 9. Open items / not verified
+## 9. Open items — status
 
-- Thinking-mode pass@1 at `xhigh` (too slow: ~220 s/exercise). `medium` is measured at 38.2%.
-- The thinking run was interrupted by a machine reboot at 24/34 and resumed for the
-  remaining 10 exercises; `aider_lite` appends per-exercise JSONL, so the merge is exact.
-- No KL-divergence vs a Q8_0 baseline yet. Note the logits file would be ~23.6 GiB at
-  `--chunks 200` given the 248k vocab, so `--chunks` must be bounded.
-- `UD-Q3_K_XL` revision `408fcc18` (no 2-bit tensors) not benchmarked against current.
-- Official aider-polyglot (diff format, multi-language) not run — only the whole-file Python subset.
-- ExLlamaV3 accuracy not measured (would need TabbyAPI to expose an OpenAI endpoint).
+| item | status |
+|---|---|
+| Official aider-polyglot (diff format, multi-language) | **done** — §14: 63.3% pass@2, 100% well-formed |
+| KL-divergence vs a Q8_0 reference | **done** — §11 |
+| `UD-Q3_K_XL` revision `408fcc18` comparison | **done** — §11/§12: current V3 wins |
+| ExLlamaV3 accuracy | **done** — §13: 38.2% pass@2, identical to llama.cpp |
+
+Still not done:
+- Thinking-mode pass@1 at `xhigh` (~220 s/exercise — impractical here; `medium` is measured).
 - Ollama / LM Studio not benchmarked; both vendor llama.cpp and should track it minus overhead.
-- `wsl --update` (2.4.13 → 2.7.11, Blackwell CUDA-graph fixes) not yet applied.
-
-
----
+- `wsl --update` (2.4.13 → 2.7.x) not applied — deferred, and not the cause of §10.
+- Tool-calling correctness (BFCL / `test-chat-auto-parser`) not exercised; the polyglot run's
+  100% well-formed diff rate is adjacent evidence but not the same thing.
+- KLD used `--chunks 100` (11.8 GiB of logits); more chunks would tighten the tail percentiles.
 
 ## 10. Machine stability — memory corruption, not a driver or the workload
 
@@ -495,3 +496,37 @@ operational fit:
 
 **Verdict: llama.cpp + MTP.** ExLlamaV3 is a credible engine on this hardware and worth
 revisiting if an EXL3 MTP/EAGLE draft appears, but today MTP is decisive.
+
+
+---
+
+## 14. Official Aider polyglot benchmark (diff edit format)
+
+30 exercises across Python/Go/Rust, `--edit-format diff`, `--tries 2`, thinking at
+`reasoning_effort=medium`. This is the real leaderboard harness, not our whole-file approximation.
+
+| metric | result |
+|---|---:|
+| pass_rate_1 | 46.7% (14/30) |
+| **pass_rate_2** | **63.3%** (19/30) |
+| **percent_cases_well_formed** | **100.0%** |
+| malformed responses | 0 |
+| syntax errors / lazy comments | 0 / 0 |
+| exhausted context windows / test timeouts | 0 / 0 |
+| seconds per case | 124 |
+
+**The 100% well-formed rate is the notable result.** In diff format the model must emit
+SEARCH/REPLACE blocks that apply cleanly against the existing file; a model that cannot do this
+reliably is unusable in a real coding agent no matter how good its raw code is. Zero malformed
+responses across 30 exercises and 3 languages says the edit-format plumbing (llama.cpp `--jinja`
+plus this GGUF's template) is sound. Our whole-file harness cannot see this axis at all.
+
+Note it scores **higher** than our `aider_lite` pass@2 (63.3% vs 58.8%) despite the harder edit
+format — the polyglot set and language mix differ, so the two are not directly comparable.
+
+### ⚠️ `benchmark.py` shuffles the exercise set unseeded
+`random.shuffle(test_dnames)` runs with no seed before `--num-tests N` truncates, so **every
+invocation tests a different random N**. Our first quant A/B overlapped on only 8 of 30
+exercises and was discarded. Pin the set with `--keywords` (see `KEYWORDS` in
+`bench/legion/run_aider_polyglot.sh` and `bench/legion/poly30_exercise_set.txt`) before comparing
+any two runs.
