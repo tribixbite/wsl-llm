@@ -1,0 +1,1 @@
+mtp_32k_q8k_q4v|-c 32768 -ctk q8_0 -ctv q4_0 --parallel 1 --spec-type draft-mtp -md /home/will/models/Qwen3.8-27B-GGUF/MTP/mtp-Qwen3.8-27B-Q4_0.gguf

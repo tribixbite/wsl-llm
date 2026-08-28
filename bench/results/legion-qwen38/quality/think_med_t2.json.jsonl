@@ -1,0 +1,2 @@
+{"name": "affine-cipher", "pass": true, "pass1": true, "pass2": true, "gen_s": 64.3}
+{"name": "beer-song", "pass": true, "pass1": false, "pass2": true, "gen_s": 84.5}

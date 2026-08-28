@@ -1,0 +1,7 @@
+# tries=2 quality runs, deliberately WITHOUT the MTP head.
+# MTP is quality-neutral (20.6% vs 17.6%, p=0.59) but costs 1.83 GiB, leaving only
+# ~1.1-1.3 GiB of VRAM slack. Both 0x1E bugchecks today occurred while a ~15.2 GiB
+# config was resident, so for a long unattended quality run we trade ~2x speed for
+# 2.9 GiB of headroom and stay well clear of the WDDM eviction boundary.
+think_med_t2|-c 32768 -ctk q8_0 -ctv q8_0 --parallel 1 --reasoning-effort medium|--think
+nothink_t2|-c 32768 -ctk q8_0 -ctv q8_0 --parallel 1 --reasoning-budget 0|
