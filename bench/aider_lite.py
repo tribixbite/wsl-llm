@@ -48,12 +48,14 @@ def extract_code(text):
         return max(blocks, key=len).strip()
     return text.strip()
 
-def call(url, model, key, messages, max_tokens=3000, timeout=600, think=False):
+def call(url, model, key, messages, max_tokens=3000, timeout=900, think=False, effort=None):
     if isinstance(messages, str):                      # back-compat: bare prompt
         messages = [{"role": "user", "content": messages}]
     body = {"model": model, "messages": messages,
             "max_tokens": max_tokens, "temperature": 0.6, "top_p": 0.95, "top_k": 20,
             "chat_template_kwargs": {"enable_thinking": bool(think)}}
+    if effort:  # Qwen 3.8+ uses reasoning_effort (xhigh/medium/low/none) instead
+        body["chat_template_kwargs"] = {"reasoning_effort": effort}
     req = urllib.request.Request(url.rstrip("/") + "/v1/chat/completions",
                                  data=json.dumps(body).encode(),
                                  headers={"Content-Type": "application/json",
@@ -92,10 +94,10 @@ RETRY_TEMPLATE = (
 )
 
 
-def attempt(url, model, key, messages, ex_dir, name, py, max_tokens, think):
+def attempt(url, model, key, messages, ex_dir, name, py, max_tokens, think, effort=None):
     """One model call + test run. Returns (ok, test_output, reply_text, seconds)."""
     started = time.time()
-    reply = call(url, model, key, messages, max_tokens=max_tokens, think=think)
+    reply = call(url, model, key, messages, max_tokens=max_tokens, think=think, effort=effort)
     elapsed = time.time() - started
     ok, output = run_tests(ex_dir, name, extract_code(reply), py)
     return ok, output, reply, elapsed
@@ -110,12 +112,13 @@ def main():
     ap.add_argument("--out", default=None)
     ap.add_argument("--exercises", default=None, help="comma-separated names; else first N alphabetically")
     ap.add_argument("--think", action="store_true", help="enable_thinking:true (needs server reasoning-budget>0)")
+    ap.add_argument("--effort", default=None, help="Qwen3.8+ reasoning_effort: xhigh|medium|low|none")
     ap.add_argument("--max-tokens", type=int, default=0, help="0=auto (3000, or 20000 with --think)")
     ap.add_argument("--tries", type=int, default=2,
                     help="attempts per exercise; 2 matches the official aider benchmark "
                          "(test output fed back on failure). 1 = legacy single-attempt.")
     args = ap.parse_args()
-    max_tokens = args.max_tokens or (20000 if args.think else 3000)
+    max_tokens = args.max_tokens or (20000 if (args.think or args.effort) else 3000)
 
     all_ex = sorted(d for d in os.listdir(PRACTICE) if os.path.isdir(os.path.join(PRACTICE, d)))
     names = args.exercises.split(",") if args.exercises else all_ex[:args.n]
@@ -131,7 +134,8 @@ def main():
         tail = ""
         try:
             ok, tail, reply, dt = attempt(args.url, args.model, args.key, messages,
-                                          ex_dir, name, args.py, max_tokens, args.think)
+                                          ex_dir, name, args.py, max_tokens, args.think,
+                                          args.effort)
             gen_s += dt
             pass1 = pass2 = ok
             # Second attempt: feed the pytest output back into the same
@@ -141,7 +145,8 @@ def main():
                 messages.append({"role": "user",
                                  "content": RETRY_TEMPLATE.format(output=tail, slug=slug)})
                 ok, tail, _, dt = attempt(args.url, args.model, args.key, messages,
-                                          ex_dir, name, args.py, max_tokens, args.think)
+                                          ex_dir, name, args.py, max_tokens, args.think,
+                                          args.effort)
                 gen_s += dt
                 pass2 = ok
         except Exception as e:

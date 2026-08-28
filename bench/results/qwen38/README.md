@@ -78,6 +78,45 @@ cd ~/llama.cpp && git pull origin master   # must include ece963f
 Thinking is ON by default; control with `reasoning_effort` = `xhigh`/`medium`/`low`/
 `none`. **Never greedy** (same guidance as prior Qwen gens).
 
+## Quality: aider polyglot (python subset, whole-file, single-attempt)
+
+Same harness/protocol as `../qwen36-27b/aider-polyglot/README.md`. Served on the
+**Q6_K_XL dual-GPU + MTP** config above.
+
+| Model / mode | pass@1 |
+|---|---:|
+| **Qwen3.8-27B, MTP + `reasoning_effort=medium`** | **14/34 = 41.2%** ← best overall |
+| Qwen3.6-27B Dense, forced-budget thinking | 13/34 = 38.2% |
+| Qwen3.6-27B Dense, thinking OFF | 12/34 = 35.3% |
+| Qwen3.6-35B-A3B, forced-budget thinking | 11/34 = 32.4% |
+| Qwen3.6-35B-A3B / Qwen3-Coder-30B-A3B, thinking OFF | 8/34 = 23.5% |
+| **Qwen3.8-27B, thinking OFF** | **7/34 = 20.6%** ← worst |
+
+### The headline finding: Qwen 3.8 is thinking-first, and it matters enormously
+
+**Thinking mode DOUBLES Qwen 3.8's score (20.6% → 41.2%).** That is by far the
+largest thinking delta we've measured — Qwen 3.6-27B only gained +2.9 pts from
+thinking (35.3 → 38.2), and the 35B-A3B gained +8.9 (23.5 → 32.4).
+
+Critically, **with thinking OFF Qwen 3.8 is the WORST model we've benchmarked
+(20.6%) — worse than Qwen 3.6-35B-A3B and the Coder-30B.** If you evaluate Qwen 3.8
+the way you'd evaluate a 3.6-generation model (thinking off for speed), you will
+conclude it's a regression. In its intended mode it's the best model on this
+hardware.
+
+The thinking-OFF result was verified genuine (not a harness artifact):
+`finish_reason: stop`, valid code block emitted, no truncation, no runaway reasoning
+— the model simply produces weaker code when its reasoning is suppressed.
+
+Unlike the Qwen 3.6-35B-A3B "overthinking spiral" (which hit the token cap and
+emitted empty answers), Qwen 3.8 at `reasoning_effort=medium` **converges fast and
+cleanly** (~30–120 s/exercise, well under the 12k-token cap). `reasoning_effort` is
+the right control surface for this model — not a numeric `REASONING_BUDGET`.
+
+**Operational recommendation: always run Qwen 3.8 with `reasoning_effort` ≥ medium
+and `--spec-type draft-mtp`.** MTP recovers most of the speed cost of thinking
+(59 t/s code), so you get both the quality and acceptable throughput.
+
 ## Not tested here
 
 The `syv-ai/qwen38-27b-rtx3090` vLLM W4A16 stack claims ~114 t/s single-user /
