@@ -1,2 +1,4 @@
 [1/34] affine-cipher            PASS    (30s)
 [2/34] beer-song                PASS@2  (52s)
+[3/34] book-store               PASS@2  (326s)
+[4/34] bottle-song              PASS@2  (28s)
