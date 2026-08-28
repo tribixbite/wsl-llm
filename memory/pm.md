@@ -295,3 +295,25 @@ above 81 C, no thermal events). Crashes continued through all of it.
 User decision 2026-08-28: **leave it, keep benchmarking** (harness resumes per-exercise);
 `wsl --update` and NVIDIA driver update deferred — neither is the root cause.
 Recommended when convenient: MemTest86 from USB, then derate memory to 5200/4800 if it fails.
+
+
+## Open items — ALL CLOSED (2026-08-28)
+
+| item | result |
+|---|---|
+| Official aider-polyglot (diff, py/go/rust) | **63.3% pass@2**, 46.7% pass@1, **100% well-formed, 0 malformed** |
+| KL-divergence vs Q8_0 | V3 mean KLD **0.02484**, top-1 agreement **93.15%** |
+| `408fcc18` quant comparison | **V3 wins** — lower KLD at every percentile 0.1-99%, 0.28 GiB smaller, 17-30% faster |
+| ExLlamaV3 accuracy | **38.2% pass@2 — identical to llama.cpp** (13/34 both) |
+
+Key reversals from measurement:
+- The forum claim that Dynamic-V3 is "sloppier" due to 24 two-bit tensors is **wrong**;
+  V3 tracks the Q8_0 reference better in the typical case. Do NOT pin 408fcc18.
+- 408fcc18 is 90.4% i-quant (IQ4_XS+IQ3_S) vs V3's 64.3%; i-quants dequantize via codebooks
+  and are slower on CUDA — hence 28.8 vs 34.6 t/s median decode.
+- `aider/benchmark/benchmark.py` does `random.shuffle` UNSEEDED, so `--num-tests N` picks a
+  different N every run. Pin with `--keywords` or any A/B is void (our first one overlapped
+  on 8 of 30 and was discarded).
+
+Final engine verdict: **llama.cpp + MTP**. ExLlamaV3 ties on quality and beats llama.cpp's
+baseline by 11%, but llama.cpp+MTP is ~70% faster than ExLlamaV3 and no EXL3 MTP head exists.

@@ -29,6 +29,14 @@ nvidia-smi --query-gpu=name,compute_cap --format=csv,noheader
   **non-thinking** temp 0.7 / top_p 0.80 / presence_penalty 1.5. `reasoning_effort` is
   `xhigh` (default) | `medium` | `low` — `xhigh` costs ~220 s/exercise, use `medium`.
 - vLLM/SGLang are **not usable** for this model here: every 4-bit safetensors quant is 17.7–21.8 GiB.
+- **Use the CURRENT `UD-Q3_K_XL`, not revision `408fcc18`.** Despite V3 having 24 two-bit
+  tensors (7.33% of params), it beats 408fcc18 on mean KLD (0.0248 vs 0.0271), top-1 agreement
+  (93.1% vs 92.8%) and RMS Δp vs a Q8_0 reference — and is 0.28 GiB smaller and 17–30% faster
+  (408 is 90.4% i-quant, which dequantizes slower on CUDA). The forum complaint is not supported.
+- ExLlamaV3 ties llama.cpp on quality (38.2% pass@2 both) and beats its baseline by 11%, but
+  **llama.cpp + MTP is ~70% faster than ExLlamaV3** — no EXL3 MTP draft head exists.
+- ⚠️ `aider/benchmark/benchmark.py` calls `random.shuffle` **unseeded** before `--num-tests`,
+  so every run tests a different random subset. Pin with `--keywords` before any A/B.
 - **Report pass@2, not pass@1** — `bench/aider_lite.py --tries 2` (now the default) matches the
   aider leaderboard by feeding pytest output back for a second attempt. It is worth ~2.2x:
   thinking 26.5% -> **58.8%**, non-thinking 17.6% -> **38.2%**.
