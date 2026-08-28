@@ -157,21 +157,38 @@ point** — matching the independent note in `CLAUDE.md` from the Legion machine
 ("`xhigh` costs ~220 s/exercise, use `medium`"). Raw (partial):
 `aider_q38_q6_effort_xhigh.json`.
 
-## vLLM stack (`syv-ai/qwen38-27b-rtx3090`) — ATTEMPTED, WEDGES ON THIS BOX
+## ⭐ vLLM stack (`syv-ai/qwen38-27b-rtx3090`) — WORKS, and is the TPS champion
 
-Claim: ~114–121 tok/s single-user (MTP), ~127–130 with DFlash2. We got it fully
-installed and loading, then it **wedged before serving a single token**.
+**105 t/s average, 116 t/s code, 124 t/s json — ~2× the best llama.cpp config**,
+confirming the repo's ~114–121 tok/s claim. TTFT 132–171 ms.
 
-**Result: model loaded (22 GB VRAM), port 18020 LISTENING, log says
-`Application startup complete` — but 0% GPU utilization and every HTTP request
-times out (`HTTP:000` at 15 s). EngineCore alive but unresponsive.**
+| Config | prose | code | json | avg |
+|---|---:|---:|---:|---:|
+| **vLLM W4A16 + MTP n=4, `MAX_SEQS=1`** ⭐ | 74.5 | **116.4** | **124.1** | **105.0** |
+| llama.cpp Q6_K_XL dual-GPU + MTP | 41.1 | 59.3 | 60.0 | 53.5 |
+| llama.cpp Q5_K_XL single + MTP | 29.2 | 39.6 | 39.4 | 36.1 |
 
-This is the **same failure mode this repo already documented for vLLM on this WSL2
-box** — vLLM 0.17 wedged during the LCB runs, 0.22 during the EAGLE3 test, and now
-0.28. Three versions, three wedges. **vLLM is not reliable on this machine**;
-llama.cpp is the supported path here.
+### The gotcha that made it look broken: `MAX_SEQS`
 
-### Install obstacles cleared along the way (all fixed, none was the blocker)
+The first launch used the default **`max_num_seqs: 8`** at
+`gpu_memory_utilization 0.93` (≈22.3 GB of 24 GB). It loaded, LISTENed, logged
+`Application startup complete` — then **0% GPU util and every request timed out**.
+
+That is **not** an engine bug. It is the exact **WSL2 VRAM-eviction trap** the
+Legion notes document for llama.cpp's `--parallel 4`: WSL2 has no OOM guardrail, so
+**WDDM silently evicts the weights to system RAM while `/health` keeps answering**.
+Setting **`MAX_SEQS=1`** fixed it outright — same VRAM figure (21.9 GB), but the
+model stays resident and serves at 105 t/s.
+
+**Lesson (straight from `docs/QWEN38_27B_LEGION_BENCHMARKS.md`): never trust
+"it loaded" — validate every config with a *timed generation*.** A health probe
+cannot distinguish a healthy server from an evicted one. This cost us an incorrect
+"vLLM is unreliable on this box" conclusion, since the earlier 0.17/0.22 failures
+may well have been the same eviction rather than engine instability.
+
+### Install obstacles cleared (none was the real blocker)
+
+
 
 | Obstacle | Fix |
 |---|---|
