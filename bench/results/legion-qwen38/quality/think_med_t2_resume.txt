@@ -9,3 +9,5 @@
 [9/21] react                    FAIL    (231s)  …1 failed, 13 passed in 0.16s
 [10/21] rest-api                 FAIL    (113s)  …1 failed in 0.16s
 [11/21] robot-name               PASS    (35s)
+[12/21] scale-generator          FAIL    (434s)  …1 failed, 1 passed in 0.15s
+[13/21] sgf-parsing              PASS@2  (505s)
