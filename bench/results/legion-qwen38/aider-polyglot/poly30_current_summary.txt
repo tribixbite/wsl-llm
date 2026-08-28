@@ -1,0 +1,26 @@
+────── /home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30 ──────
+- dirname: 2026-08-28-01-43-23--qwen38-poly30
+  test_cases: 30
+  model: openai/qwen3.8-27b
+  edit_format: diff
+  commit_hash: 5dc9490
+  pass_rate_1: 46.7
+  pass_rate_2: 63.3
+  pass_num_1: 14
+  pass_num_2: 19
+  percent_cases_well_formed: 100.0
+  error_outputs: 0
+  num_malformed_responses: 0
+  num_with_malformed_responses: 0
+  user_asks: 0
+  lazy_comments: 0
+  syntax_errors: 0
+  indentation_errors: 0
+  exhausted_context_windows: 0
+  prompt_tokens: 179876
+  completion_tokens: 137986
+  test_timeouts: 0
+  total_tests: 225
+  command: aider --model openai/qwen3.8-27b
+  date: 2026-08-28
+  versions: 0.86.3.dev

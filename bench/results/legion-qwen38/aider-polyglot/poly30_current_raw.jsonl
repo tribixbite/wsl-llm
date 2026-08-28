@@ -1,0 +1,981 @@
+--- /home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/go/exercises/practice/word-search/.aider.results.json
+{
+    "testdir": "/home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/go/exercises/practice/word-search",
+    "testcase": "word-search",
+    "model": "openai/qwen3.8-27b",
+    "edit_format": "diff",
+    "tests_outcomes": [
+        false,
+        true
+    ],
+    "cost": 0.0,
+    "duration": 123.33550834655762,
+    "test_timeouts": 0,
+    "commit_hash": "5dc9490",
+    "num_error_outputs": 0,
+    "num_user_asks": 0,
+    "num_exhausted_context_windows": 0,
+    "num_malformed_responses": 0,
+    "syntax_errors": 0,
+    "indentation_errors": 0,
+    "lazy_comments": 0,
+    "reasoning_effort": null,
+    "prompt_tokens": 8353,
+    "completion_tokens": 4085,
+    "thinking_tokens": null,
+    "chat_hashes": [
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "eaad36b64a4a2d6525816bf870fdfcc8d0926ae1"
+        ],
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "8c27bed42f68f85386b402a697e35cfe1ef425f9"
+        ]
+    ]
+}--- /home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/go/exercises/practice/alphametics/.aider.results.json
+{
+    "testdir": "/home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/go/exercises/practice/alphametics",
+    "testcase": "alphametics",
+    "model": "openai/qwen3.8-27b",
+    "edit_format": "diff",
+    "tests_outcomes": [
+        true
+    ],
+    "cost": 0.0,
+    "duration": 68.23931193351746,
+    "test_timeouts": 0,
+    "commit_hash": "5dc9490",
+    "num_error_outputs": 0,
+    "num_user_asks": 0,
+    "num_exhausted_context_windows": 0,
+    "num_malformed_responses": 0,
+    "syntax_errors": 0,
+    "indentation_errors": 0,
+    "lazy_comments": 0,
+    "reasoning_effort": null,
+    "prompt_tokens": 2550,
+    "completion_tokens": 2188,
+    "thinking_tokens": null,
+    "chat_hashes": [
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "a9f1f435ac01a1fb9d55130a1e662b275e538a61"
+        ]
+    ]
+}--- /home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/go/exercises/practice/bowling/.aider.results.json
+{
+    "testdir": "/home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/go/exercises/practice/bowling",
+    "testcase": "bowling",
+    "model": "openai/qwen3.8-27b",
+    "edit_format": "diff",
+    "tests_outcomes": [
+        true
+    ],
+    "cost": 0.0,
+    "duration": 283.3578836917877,
+    "test_timeouts": 0,
+    "commit_hash": "5dc9490",
+    "num_error_outputs": 0,
+    "num_user_asks": 0,
+    "num_exhausted_context_windows": 0,
+    "num_malformed_responses": 0,
+    "syntax_errors": 0,
+    "indentation_errors": 0,
+    "lazy_comments": 0,
+    "reasoning_effort": null,
+    "prompt_tokens": 2740,
+    "completion_tokens": 10214,
+    "thinking_tokens": null,
+    "chat_hashes": [
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "c15e72b4454847c40fc5dfc36871162c36d3fa72"
+        ]
+    ]
+}--- /home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/go/exercises/practice/forth/.aider.results.json
+{
+    "testdir": "/home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/go/exercises/practice/forth",
+    "testcase": "forth",
+    "model": "openai/qwen3.8-27b",
+    "edit_format": "diff",
+    "tests_outcomes": [
+        false,
+        false
+    ],
+    "cost": 0.0,
+    "duration": 190.67540884017944,
+    "test_timeouts": 0,
+    "commit_hash": "5dc9490",
+    "num_error_outputs": 0,
+    "num_user_asks": 0,
+    "num_exhausted_context_windows": 0,
+    "num_malformed_responses": 0,
+    "syntax_errors": 0,
+    "indentation_errors": 0,
+    "lazy_comments": 0,
+    "reasoning_effort": null,
+    "prompt_tokens": 8818,
+    "completion_tokens": 6062,
+    "thinking_tokens": null,
+    "chat_hashes": [
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "47ddb02a1e8e56ee1d406399a13d807afd4e1bf0"
+        ],
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "3f602e5d6905cb6f5ea8acf13d88f91887af2bd4"
+        ]
+    ]
+}--- /home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/go/exercises/practice/palindrome-products/.aider.results.json
+{
+    "testdir": "/home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/go/exercises/practice/palindrome-products",
+    "testcase": "palindrome-products",
+    "model": "openai/qwen3.8-27b",
+    "edit_format": "diff",
+    "tests_outcomes": [
+        false,
+        false
+    ],
+    "cost": 0.0,
+    "duration": 78.29519867897034,
+    "test_timeouts": 0,
+    "commit_hash": "5dc9490",
+    "num_error_outputs": 0,
+    "num_user_asks": 0,
+    "num_exhausted_context_windows": 0,
+    "num_malformed_responses": 0,
+    "syntax_errors": 0,
+    "indentation_errors": 0,
+    "lazy_comments": 0,
+    "reasoning_effort": null,
+    "prompt_tokens": 6217,
+    "completion_tokens": 2050,
+    "thinking_tokens": null,
+    "chat_hashes": [
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "a0e45286ade6796b8ca6b5f2805117548f2aafd3"
+        ],
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "b1807a3316a80ec6c2ebf436e13a4ad8c1b3081f"
+        ]
+    ]
+}--- /home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/go/exercises/practice/poker/.aider.results.json
+{
+    "testdir": "/home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/go/exercises/practice/poker",
+    "testcase": "poker",
+    "model": "openai/qwen3.8-27b",
+    "edit_format": "diff",
+    "tests_outcomes": [
+        false,
+        false
+    ],
+    "cost": 0.0,
+    "duration": 355.7188708782196,
+    "test_timeouts": 0,
+    "commit_hash": "5dc9490",
+    "num_error_outputs": 0,
+    "num_user_asks": 0,
+    "num_exhausted_context_windows": 0,
+    "num_malformed_responses": 0,
+    "syntax_errors": 0,
+    "indentation_errors": 0,
+    "lazy_comments": 0,
+    "reasoning_effort": null,
+    "prompt_tokens": 11675,
+    "completion_tokens": 12086,
+    "thinking_tokens": null,
+    "chat_hashes": [
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "0993154ece9dcd28c434299a2532c96683079137"
+        ],
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "a6535011601c2d4e8bf4ec513a63b9986a5370aa"
+        ]
+    ]
+}--- /home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/go/exercises/practice/bottle-song/.aider.results.json
+{
+    "testdir": "/home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/go/exercises/practice/bottle-song",
+    "testcase": "bottle-song",
+    "model": "openai/qwen3.8-27b",
+    "edit_format": "diff",
+    "tests_outcomes": [
+        true
+    ],
+    "cost": 0.0,
+    "duration": 68.29356575012207,
+    "test_timeouts": 0,
+    "commit_hash": "5dc9490",
+    "num_error_outputs": 0,
+    "num_user_asks": 0,
+    "num_exhausted_context_windows": 0,
+    "num_malformed_responses": 0,
+    "syntax_errors": 0,
+    "indentation_errors": 0,
+    "lazy_comments": 0,
+    "reasoning_effort": null,
+    "prompt_tokens": 2535,
+    "completion_tokens": 2030,
+    "thinking_tokens": null,
+    "chat_hashes": [
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "71678dfef188bcda067079563770f10945b1b393"
+        ]
+    ]
+}--- /home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/go/exercises/practice/sublist/.aider.results.json
+{
+    "testdir": "/home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/go/exercises/practice/sublist",
+    "testcase": "sublist",
+    "model": "openai/qwen3.8-27b",
+    "edit_format": "diff",
+    "tests_outcomes": [
+        false,
+        false
+    ],
+    "cost": 0.0,
+    "duration": 106.53399634361267,
+    "test_timeouts": 0,
+    "commit_hash": "5dc9490",
+    "num_error_outputs": 0,
+    "num_user_asks": 0,
+    "num_exhausted_context_windows": 0,
+    "num_malformed_responses": 0,
+    "syntax_errors": 0,
+    "indentation_errors": 0,
+    "lazy_comments": 0,
+    "reasoning_effort": null,
+    "prompt_tokens": 6214,
+    "completion_tokens": 2984,
+    "thinking_tokens": null,
+    "chat_hashes": [
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "402f855395e025be0b6a019973bec9867bcb3e34"
+        ],
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "d0a401f20f5ccb8717f653727e0d7d02768bfbd3"
+        ]
+    ]
+}--- /home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/rust/exercises/practice/accumulate/.aider.results.json
+{
+    "testdir": "/home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/rust/exercises/practice/accumulate",
+    "testcase": "accumulate",
+    "model": "openai/qwen3.8-27b",
+    "edit_format": "diff",
+    "tests_outcomes": [
+        false,
+        false
+    ],
+    "cost": 0.0,
+    "duration": 37.01340842247009,
+    "test_timeouts": 0,
+    "commit_hash": "5dc9490",
+    "num_error_outputs": 0,
+    "num_user_asks": 0,
+    "num_exhausted_context_windows": 0,
+    "num_malformed_responses": 0,
+    "syntax_errors": 0,
+    "indentation_errors": 0,
+    "lazy_comments": 0,
+    "reasoning_effort": null,
+    "prompt_tokens": 8688,
+    "completion_tokens": 1178,
+    "thinking_tokens": null,
+    "chat_hashes": [
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "f1b90eba4ace08429346a8b55625dfd8dbebb506"
+        ],
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "73e5ff73f0f82da40a8fe523c10d658def510db4"
+        ]
+    ]
+}--- /home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/rust/exercises/practice/alphametics/.aider.results.json
+{
+    "testdir": "/home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/rust/exercises/practice/alphametics",
+    "testcase": "alphametics",
+    "model": "openai/qwen3.8-27b",
+    "edit_format": "diff",
+    "tests_outcomes": [
+        false,
+        false
+    ],
+    "cost": 0.0,
+    "duration": 228.15208315849304,
+    "test_timeouts": 0,
+    "commit_hash": "5dc9490",
+    "num_error_outputs": 0,
+    "num_user_asks": 0,
+    "num_exhausted_context_windows": 0,
+    "num_malformed_responses": 0,
+    "syntax_errors": 0,
+    "indentation_errors": 0,
+    "lazy_comments": 0,
+    "reasoning_effort": null,
+    "prompt_tokens": 6819,
+    "completion_tokens": 7492,
+    "thinking_tokens": null,
+    "chat_hashes": [
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "a3134c1dd947abeef61e86a0ef3eb01a6ca3e25e"
+        ],
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "0f4b72362b16c200c039fbc9c27f9bba61f883ff"
+        ]
+    ]
+}--- /home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/rust/exercises/practice/bowling/.aider.results.json
+{
+    "testdir": "/home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/rust/exercises/practice/bowling",
+    "testcase": "bowling",
+    "model": "openai/qwen3.8-27b",
+    "edit_format": "diff",
+    "tests_outcomes": [
+        true
+    ],
+    "cost": 0.0,
+    "duration": 145.60963463783264,
+    "test_timeouts": 0,
+    "commit_hash": "5dc9490",
+    "num_error_outputs": 0,
+    "num_user_asks": 0,
+    "num_exhausted_context_windows": 0,
+    "num_malformed_responses": 0,
+    "syntax_errors": 0,
+    "indentation_errors": 0,
+    "lazy_comments": 0,
+    "reasoning_effort": null,
+    "prompt_tokens": 2790,
+    "completion_tokens": 5485,
+    "thinking_tokens": null,
+    "chat_hashes": [
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "6bb23314b3f01db75bd4295b3dfd5253d95fb5ae"
+        ]
+    ]
+}--- /home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/rust/exercises/practice/forth/.aider.results.json
+{
+    "testdir": "/home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/rust/exercises/practice/forth",
+    "testcase": "forth",
+    "model": "openai/qwen3.8-27b",
+    "edit_format": "diff",
+    "tests_outcomes": [
+        false,
+        false
+    ],
+    "cost": 0.0,
+    "duration": 231.6900758743286,
+    "test_timeouts": 0,
+    "commit_hash": "5dc9490",
+    "num_error_outputs": 0,
+    "num_user_asks": 0,
+    "num_exhausted_context_windows": 0,
+    "num_malformed_responses": 0,
+    "syntax_errors": 0,
+    "indentation_errors": 0,
+    "lazy_comments": 0,
+    "reasoning_effort": null,
+    "prompt_tokens": 8384,
+    "completion_tokens": 7144,
+    "thinking_tokens": null,
+    "chat_hashes": [
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "9dcd7c0ea4b6f4b2a20587f4620afd594671bf56"
+        ],
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "efae652099ec4acda4c74ff2dd9e51787ade35d0"
+        ]
+    ]
+}--- /home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/rust/exercises/practice/grade-school/.aider.results.json
+{
+    "testdir": "/home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/rust/exercises/practice/grade-school",
+    "testcase": "grade-school",
+    "model": "openai/qwen3.8-27b",
+    "edit_format": "diff",
+    "tests_outcomes": [
+        true
+    ],
+    "cost": 0.0,
+    "duration": 61.26799726486206,
+    "test_timeouts": 0,
+    "commit_hash": "5dc9490",
+    "num_error_outputs": 0,
+    "num_user_asks": 0,
+    "num_exhausted_context_windows": 0,
+    "num_malformed_responses": 0,
+    "syntax_errors": 0,
+    "indentation_errors": 0,
+    "lazy_comments": 0,
+    "reasoning_effort": null,
+    "prompt_tokens": 2548,
+    "completion_tokens": 1851,
+    "thinking_tokens": null,
+    "chat_hashes": [
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "2fd44c5bebd57415beaff479fa74e92719b4d58f"
+        ]
+    ]
+}--- /home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/rust/exercises/practice/nucleotide-codons/.aider.results.json
+{
+    "testdir": "/home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/rust/exercises/practice/nucleotide-codons",
+    "testcase": "nucleotide-codons",
+    "model": "openai/qwen3.8-27b",
+    "edit_format": "diff",
+    "tests_outcomes": [
+        false,
+        true
+    ],
+    "cost": 0.0,
+    "duration": 166.0043864250183,
+    "test_timeouts": 0,
+    "commit_hash": "5dc9490",
+    "num_error_outputs": 0,
+    "num_user_asks": 0,
+    "num_exhausted_context_windows": 0,
+    "num_malformed_responses": 0,
+    "syntax_errors": 0,
+    "indentation_errors": 0,
+    "lazy_comments": 0,
+    "reasoning_effort": null,
+    "prompt_tokens": 7814,
+    "completion_tokens": 5173,
+    "thinking_tokens": null,
+    "chat_hashes": [
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "0c76c386ad05b365b2cf84635f350f3c5d85225e"
+        ],
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "c6ae66d23b50888ae40d461b308fd42d641feb5a"
+        ]
+    ]
+}--- /home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/rust/exercises/practice/dot-dsl/.aider.results.json
+{
+    "testdir": "/home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/rust/exercises/practice/dot-dsl",
+    "testcase": "dot-dsl",
+    "model": "openai/qwen3.8-27b",
+    "edit_format": "diff",
+    "tests_outcomes": [
+        false,
+        false
+    ],
+    "cost": 0.0,
+    "duration": 261.4166419506073,
+    "test_timeouts": 0,
+    "commit_hash": "5dc9490",
+    "num_error_outputs": 0,
+    "num_user_asks": 0,
+    "num_exhausted_context_windows": 0,
+    "num_malformed_responses": 0,
+    "syntax_errors": 0,
+    "indentation_errors": 0,
+    "lazy_comments": 0,
+    "reasoning_effort": null,
+    "prompt_tokens": 9235,
+    "completion_tokens": 8612,
+    "thinking_tokens": null,
+    "chat_hashes": [
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "74e706eacab3b855fa2a8e9d39ac33531ac32beb"
+        ],
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "3b63bb4f9c1717df93d6dd9053f163ffb253ef4a"
+        ]
+    ]
+}--- /home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/rust/exercises/practice/fizzy/.aider.results.json
+{
+    "testdir": "/home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/rust/exercises/practice/fizzy",
+    "testcase": "fizzy",
+    "model": "openai/qwen3.8-27b",
+    "edit_format": "diff",
+    "tests_outcomes": [
+        false,
+        false
+    ],
+    "cost": 0.0,
+    "duration": 152.82528162002563,
+    "test_timeouts": 0,
+    "commit_hash": "5dc9490",
+    "num_error_outputs": 0,
+    "num_user_asks": 0,
+    "num_exhausted_context_windows": 0,
+    "num_malformed_responses": 0,
+    "syntax_errors": 0,
+    "indentation_errors": 0,
+    "lazy_comments": 0,
+    "reasoning_effort": null,
+    "prompt_tokens": 7487,
+    "completion_tokens": 4506,
+    "thinking_tokens": null,
+    "chat_hashes": [
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "b39ff662b07651b5ed796d8503da78cc6e3667e7"
+        ],
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "dde94386c00dbbea456518ed0fddf5f96691e943"
+        ]
+    ]
+}--- /home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/rust/exercises/practice/two-bucket/.aider.results.json
+{
+    "testdir": "/home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/rust/exercises/practice/two-bucket",
+    "testcase": "two-bucket",
+    "model": "openai/qwen3.8-27b",
+    "edit_format": "diff",
+    "tests_outcomes": [
+        true
+    ],
+    "cost": 0.0,
+    "duration": 84.35818910598755,
+    "test_timeouts": 0,
+    "commit_hash": "5dc9490",
+    "num_error_outputs": 0,
+    "num_user_asks": 0,
+    "num_exhausted_context_windows": 0,
+    "num_malformed_responses": 0,
+    "syntax_errors": 0,
+    "indentation_errors": 0,
+    "lazy_comments": 0,
+    "reasoning_effort": null,
+    "prompt_tokens": 2882,
+    "completion_tokens": 2732,
+    "thinking_tokens": null,
+    "chat_hashes": [
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "0a4943ecfe0c891c3835352c0fe36a2fab00da33"
+        ]
+    ]
+}--- /home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/go/exercises/practice/ledger/.aider.results.json
+{
+    "testdir": "/home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/go/exercises/practice/ledger",
+    "testcase": "ledger",
+    "model": "openai/qwen3.8-27b",
+    "edit_format": "diff",
+    "tests_outcomes": [
+        true
+    ],
+    "cost": 0.0,
+    "duration": 342.71155405044556,
+    "test_timeouts": 0,
+    "commit_hash": "5dc9490",
+    "num_error_outputs": 0,
+    "num_user_asks": 0,
+    "num_exhausted_context_windows": 0,
+    "num_malformed_responses": 0,
+    "syntax_errors": 0,
+    "indentation_errors": 0,
+    "lazy_comments": 0,
+    "reasoning_effort": null,
+    "prompt_tokens": 4049,
+    "completion_tokens": 12249,
+    "thinking_tokens": null,
+    "chat_hashes": [
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "51603b79833e86f49b4c86fd34db901c4bc2ecb5"
+        ]
+    ]
+}--- /home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/go/exercises/practice/food-chain/.aider.results.json
+{
+    "testdir": "/home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/go/exercises/practice/food-chain",
+    "testcase": "food-chain",
+    "model": "openai/qwen3.8-27b",
+    "edit_format": "diff",
+    "tests_outcomes": [
+        false,
+        true
+    ],
+    "cost": 0.0,
+    "duration": 130.13395810127258,
+    "test_timeouts": 0,
+    "commit_hash": "5dc9490",
+    "num_error_outputs": 0,
+    "num_user_asks": 0,
+    "num_exhausted_context_windows": 0,
+    "num_malformed_responses": 0,
+    "syntax_errors": 0,
+    "indentation_errors": 0,
+    "lazy_comments": 0,
+    "reasoning_effort": null,
+    "prompt_tokens": 9927,
+    "completion_tokens": 3886,
+    "thinking_tokens": null,
+    "chat_hashes": [
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "1c14d352ea44a8feda89bff76184069d49e1858c"
+        ],
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "0f903616d6e87787a9240b0f85e4d7bf2076f053"
+        ]
+    ]
+}--- /home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/rust/exercises/practice/grep/.aider.results.json
+{
+    "testdir": "/home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/rust/exercises/practice/grep",
+    "testcase": "grep",
+    "model": "openai/qwen3.8-27b",
+    "edit_format": "diff",
+    "tests_outcomes": [
+        true
+    ],
+    "cost": 0.0,
+    "duration": 79.44522261619568,
+    "test_timeouts": 0,
+    "commit_hash": "5dc9490",
+    "num_error_outputs": 0,
+    "num_user_asks": 0,
+    "num_exhausted_context_windows": 0,
+    "num_malformed_responses": 0,
+    "syntax_errors": 0,
+    "indentation_errors": 0,
+    "lazy_comments": 0,
+    "reasoning_effort": null,
+    "prompt_tokens": 2993,
+    "completion_tokens": 2465,
+    "thinking_tokens": null,
+    "chat_hashes": [
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "4856fceb1de2296646d6c855388b2c01efe0e480"
+        ]
+    ]
+}--- /home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/rust/exercises/practice/word-count/.aider.results.json
+{
+    "testdir": "/home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/rust/exercises/practice/word-count",
+    "testcase": "word-count",
+    "model": "openai/qwen3.8-27b",
+    "edit_format": "diff",
+    "tests_outcomes": [
+        true
+    ],
+    "cost": 0.0,
+    "duration": 69.33738994598389,
+    "test_timeouts": 0,
+    "commit_hash": "5dc9490",
+    "num_error_outputs": 0,
+    "num_user_asks": 0,
+    "num_exhausted_context_windows": 0,
+    "num_malformed_responses": 0,
+    "syntax_errors": 0,
+    "indentation_errors": 0,
+    "lazy_comments": 0,
+    "reasoning_effort": null,
+    "prompt_tokens": 2553,
+    "completion_tokens": 2207,
+    "thinking_tokens": null,
+    "chat_hashes": [
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "50497fd91bf630e15f57392296e248af6fc1b819"
+        ]
+    ]
+}--- /home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/rust/exercises/practice/simple-cipher/.aider.results.json
+{
+    "testdir": "/home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/rust/exercises/practice/simple-cipher",
+    "testcase": "simple-cipher",
+    "model": "openai/qwen3.8-27b",
+    "edit_format": "diff",
+    "tests_outcomes": [
+        false,
+        false
+    ],
+    "cost": 0.0,
+    "duration": 91.0809850692749,
+    "test_timeouts": 0,
+    "commit_hash": "5dc9490",
+    "num_error_outputs": 0,
+    "num_user_asks": 0,
+    "num_exhausted_context_windows": 0,
+    "num_malformed_responses": 0,
+    "syntax_errors": 0,
+    "indentation_errors": 0,
+    "lazy_comments": 0,
+    "reasoning_effort": null,
+    "prompt_tokens": 7987,
+    "completion_tokens": 2923,
+    "thinking_tokens": null,
+    "chat_hashes": [
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "b76da96a9348df7d08dc70851f2af85251724397"
+        ],
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "5bad19743e27f6889e12d0268b7fb266d9508790"
+        ]
+    ]
+}--- /home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/rust/exercises/practice/say/.aider.results.json
+{
+    "testdir": "/home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/rust/exercises/practice/say",
+    "testcase": "say",
+    "model": "openai/qwen3.8-27b",
+    "edit_format": "diff",
+    "tests_outcomes": [
+        true
+    ],
+    "cost": 0.0,
+    "duration": 81.61950540542603,
+    "test_timeouts": 0,
+    "commit_hash": "5dc9490",
+    "num_error_outputs": 0,
+    "num_user_asks": 0,
+    "num_exhausted_context_windows": 0,
+    "num_malformed_responses": 0,
+    "syntax_errors": 0,
+    "indentation_errors": 0,
+    "lazy_comments": 0,
+    "reasoning_effort": null,
+    "prompt_tokens": 2668,
+    "completion_tokens": 2614,
+    "thinking_tokens": null,
+    "chat_hashes": [
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "40d827a54ca25aef93adc1b8304c3ebc07200b6f"
+        ]
+    ]
+}--- /home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/python/exercises/practice/paasio/.aider.results.json
+{
+    "testdir": "/home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/python/exercises/practice/paasio",
+    "testcase": "paasio",
+    "model": "openai/qwen3.8-27b",
+    "edit_format": "diff",
+    "tests_outcomes": [
+        false,
+        false
+    ],
+    "cost": 0.0,
+    "duration": 277.2383806705475,
+    "test_timeouts": 0,
+    "commit_hash": "5dc9490",
+    "num_error_outputs": 0,
+    "num_user_asks": 0,
+    "num_exhausted_context_windows": 0,
+    "num_malformed_responses": 0,
+    "syntax_errors": 0,
+    "indentation_errors": 0,
+    "lazy_comments": 0,
+    "reasoning_effort": null,
+    "prompt_tokens": 19750,
+    "completion_tokens": 8678,
+    "thinking_tokens": null,
+    "chat_hashes": [
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "3427dc52313d9745a84993c7ba8f8832dd50c592"
+        ],
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "40e61690026f9e35c12e0cb05da29adda1b560f5"
+        ]
+    ]
+}--- /home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/python/exercises/practice/variable-length-quantity/.aider.results.json
+{
+    "testdir": "/home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/python/exercises/practice/variable-length-quantity",
+    "testcase": "variable-length-quantity",
+    "model": "openai/qwen3.8-27b",
+    "edit_format": "diff",
+    "tests_outcomes": [
+        true
+    ],
+    "cost": 0.0,
+    "duration": 51.32640314102173,
+    "test_timeouts": 0,
+    "commit_hash": "5dc9490",
+    "num_error_outputs": 0,
+    "num_user_asks": 0,
+    "num_exhausted_context_windows": 0,
+    "num_malformed_responses": 0,
+    "syntax_errors": 0,
+    "indentation_errors": 0,
+    "lazy_comments": 0,
+    "reasoning_effort": null,
+    "prompt_tokens": 2776,
+    "completion_tokens": 1927,
+    "thinking_tokens": null,
+    "chat_hashes": [
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "33d2f0607a7e86cd16e53a5f6033f20b0adda931"
+        ]
+    ]
+}--- /home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/python/exercises/practice/zebra-puzzle/.aider.results.json
+{
+    "testdir": "/home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/python/exercises/practice/zebra-puzzle",
+    "testcase": "zebra-puzzle",
+    "model": "openai/qwen3.8-27b",
+    "edit_format": "diff",
+    "tests_outcomes": [
+        true
+    ],
+    "cost": 0.0,
+    "duration": 139.8946282863617,
+    "test_timeouts": 0,
+    "commit_hash": "5dc9490",
+    "num_error_outputs": 0,
+    "num_user_asks": 0,
+    "num_exhausted_context_windows": 0,
+    "num_malformed_responses": 0,
+    "syntax_errors": 0,
+    "indentation_errors": 0,
+    "lazy_comments": 0,
+    "reasoning_effort": null,
+    "prompt_tokens": 2597,
+    "completion_tokens": 4725,
+    "thinking_tokens": null,
+    "chat_hashes": [
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "08cfdf65ab291b07ac696cee353032e10fc6f9fc"
+        ]
+    ]
+}--- /home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/python/exercises/practice/grade-school/.aider.results.json
+{
+    "testdir": "/home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/python/exercises/practice/grade-school",
+    "testcase": "grade-school",
+    "model": "openai/qwen3.8-27b",
+    "edit_format": "diff",
+    "tests_outcomes": [
+        false,
+        true
+    ],
+    "cost": 0.0,
+    "duration": 58.66040301322937,
+    "test_timeouts": 0,
+    "commit_hash": "5dc9490",
+    "num_error_outputs": 0,
+    "num_user_asks": 0,
+    "num_exhausted_context_windows": 0,
+    "num_malformed_responses": 0,
+    "syntax_errors": 0,
+    "indentation_errors": 0,
+    "lazy_comments": 0,
+    "reasoning_effort": null,
+    "prompt_tokens": 6571,
+    "completion_tokens": 1671,
+    "thinking_tokens": null,
+    "chat_hashes": [
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "a65a48e752e04c3350bc4bb60931dc9b32441489"
+        ],
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "e9fc77680ac81582b8a9e84dde78fc80801220a1"
+        ]
+    ]
+}--- /home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/python/exercises/practice/food-chain/.aider.results.json
+{
+    "testdir": "/home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/python/exercises/practice/food-chain",
+    "testcase": "food-chain",
+    "model": "openai/qwen3.8-27b",
+    "edit_format": "diff",
+    "tests_outcomes": [
+        true
+    ],
+    "cost": 0.0,
+    "duration": 126.8255226612091,
+    "test_timeouts": 0,
+    "commit_hash": "5dc9490",
+    "num_error_outputs": 0,
+    "num_user_asks": 0,
+    "num_exhausted_context_windows": 0,
+    "num_malformed_responses": 0,
+    "syntax_errors": 0,
+    "indentation_errors": 0,
+    "lazy_comments": 0,
+    "reasoning_effort": null,
+    "prompt_tokens": 2727,
+    "completion_tokens": 4149,
+    "thinking_tokens": null,
+    "chat_hashes": [
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "9f31da60349a5a684b358de5428324d0575222f7"
+        ]
+    ]
+}--- /home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/python/exercises/practice/list-ops/.aider.results.json
+{
+    "testdir": "/home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/python/exercises/practice/list-ops",
+    "testcase": "list-ops",
+    "model": "openai/qwen3.8-27b",
+    "edit_format": "diff",
+    "tests_outcomes": [
+        false,
+        true
+    ],
+    "cost": 0.0,
+    "duration": 103.7761390209198,
+    "test_timeouts": 0,
+    "commit_hash": "5dc9490",
+    "num_error_outputs": 0,
+    "num_user_asks": 0,
+    "num_exhausted_context_windows": 0,
+    "num_malformed_responses": 0,
+    "syntax_errors": 0,
+    "indentation_errors": 0,
+    "lazy_comments": 0,
+    "reasoning_effort": null,
+    "prompt_tokens": 6326,
+    "completion_tokens": 3114,
+    "thinking_tokens": null,
+    "chat_hashes": [
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "7ec213c643112df03b20af41475a3f2e62a45b1d"
+        ],
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "40025b02c5e028fe0312e3a99e076f7f06f0e1c6"
+        ]
+    ]
+}--- /home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/python/exercises/practice/affine-cipher/.aider.results.json
+{
+    "testdir": "/home/will/aider/tmp.benchmarks/2026-08-28-01-43-23--qwen38-poly30/python/exercises/practice/affine-cipher",
+    "testcase": "affine-cipher",
+    "model": "openai/qwen3.8-27b",
+    "edit_format": "diff",
+    "tests_outcomes": [
+        true
+    ],
+    "cost": 0.0,
+    "duration": 53.620112895965576,
+    "test_timeouts": 0,
+    "commit_hash": "5dc9490",
+    "num_error_outputs": 0,
+    "num_user_asks": 0,
+    "num_exhausted_context_windows": 0,
+    "num_malformed_responses": 0,
+    "syntax_errors": 0,
+    "indentation_errors": 0,
+    "lazy_comments": 0,
+    "reasoning_effort": null,
+    "prompt_tokens": 3203,
+    "completion_tokens": 1506,
+    "thinking_tokens": null,
+    "chat_hashes": [
+        [
+            "62fd2b0cd757837fb6a3c06fc4ac6b6f39ceddbe",
+            "61705de0745fa4c4fc23591cbafe8d67e2d335a3"
+        ]
+    ]
+}
