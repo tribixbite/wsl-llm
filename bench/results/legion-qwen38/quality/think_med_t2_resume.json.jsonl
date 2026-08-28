@@ -11,3 +11,6 @@
 {"name": "robot-name", "pass": true, "pass1": true, "pass2": true, "gen_s": 34.8}
 {"name": "scale-generator", "pass": false, "pass1": false, "pass2": false, "gen_s": 433.9}
 {"name": "sgf-parsing", "pass": true, "pass1": false, "pass2": true, "gen_s": 505.3}
+{"name": "simple-linked-list", "pass": true, "pass1": false, "pass2": true, "gen_s": 84.1}
+{"name": "transpose", "pass": true, "pass1": true, "pass2": true, "gen_s": 196.8}
+{"name": "tree-building", "pass": false, "pass1": false, "pass2": false, "gen_s": 184.7}
