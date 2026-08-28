@@ -7,3 +7,5 @@
 {"name": "pov", "pass": false, "pass1": false, "pass2": false, "gen_s": 157.8}
 {"name": "proverb", "pass": true, "pass1": false, "pass2": true, "gen_s": 59.7}
 {"name": "react", "pass": false, "pass1": false, "pass2": false, "gen_s": 230.8}
+{"name": "rest-api", "pass": false, "pass1": false, "pass2": false, "gen_s": 113.2}
+{"name": "robot-name", "pass": true, "pass1": true, "pass2": true, "gen_s": 34.8}
