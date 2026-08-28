@@ -1,0 +1,5 @@
+[1/21] hangman                  FAIL    (85s)  …1 failed, 2 passed in 0.14s
+[2/21] list-ops                 PASS@2  (124s)
+[3/21] paasio                   FAIL    (138s)  …1 failed, 2 passed in 0.21s
+[4/21] phone-number             FAIL    (77s)  …1 failed, 17 passed in 0.14s
+[5/21] pig-latin                PASS    (109s)
