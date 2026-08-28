@@ -74,11 +74,16 @@ Qwen3.6 on the desktop box, which needed the Madreag turboquant build.
 conventional dense 27B. The 48 DeltaNet layers hold a *constant* ~150 MiB recurrent state
 per sequence, independent of context length.
 
-### ⚠️ Quant quality caveat — verified directly in the file
+### Quant composition — verified directly in the file
 Unsloth's Dynamic-V3 rebuild of `UD-Q3_K_XL` contains **24 tensors in 2-bit classes totalling
-2,002,780,160 params = 7.33% of the model** (IQ2_S×15, IQ2_XS×4, Q2_K×3, IQ2_XXS×2). The earlier
-revision `408fcc18` (12.52 GiB) reportedly had none. If accuracy matters more than 0.28 GiB,
-pin that revision. This was confirmed by enumerating tensor dtypes, not taken from a forum post.
+2,002,780,160 params = 7.33% of the model** (IQ2_S×15, IQ2_XS×4, Q2_K×3, IQ2_XXS×2); the earlier
+`408fcc18` (12.52 GiB) has **zero**. Both confirmed by enumerating tensor dtypes, not taken from
+a forum post.
+
+Users concluded from this that V3 must be worse. **Measured, it is not** — see §11: against a
+Q8_0 reference V3 has lower mean KLD (0.0248 vs 0.0271), higher top-1 agreement (93.1% vs 92.8%)
+and lower RMS Δp, while also being smaller and faster. **Use the current revision; do not pin
+`408fcc18`.**
 
 ---
 
