@@ -22,6 +22,15 @@ LANGS="${LANGS:-python,go,rust}"
 NUM_TESTS="${NUM_TESTS:-30}"
 EDIT_FORMAT="${EDIT_FORMAT:-diff}"
 RUN_NAME="${RUN_NAME:-qwen38-polyglot}"
+# CONT=1 resumes the single matching testdir instead of starting a new one.
+# This box bugchecks at random (see docs §10), and the harness keeps a
+# .aider.results.json per exercise, so resuming is exact.
+CONT="${CONT:-0}"
+# benchmark.py does random.shuffle(test_dnames) with NO seed (~line 343), so
+# --num-tests N picks a DIFFERENT random N every run. Any A/B across runs is
+# invalid unless the set is pinned. KEYWORDS pins it to exact
+# "<lang>/exercises/practice/<name>" paths via --keywords.
+KEYWORDS="${KEYWORDS:-}"
 SERVER_FLAGS="${SERVER_FLAGS:--c 32768 -ctk q8_0 -ctv q8_0 --parallel 1 --reasoning-effort medium}"
 OUT_DIR="${OUT_DIR:-$REPO_DIR/bench/results/legion-qwen38/aider-polyglot}"
 
@@ -65,7 +74,8 @@ export AIDER_ANALYTICS=false
   --num-tests "$NUM_TESTS" \
   --threads 1 \
   --tries 2 \
-  --new \
+  $([ "$CONT" = "1" ] && echo --cont || echo --new) \
+  ${KEYWORDS:+--keywords "$KEYWORDS"} \
   --exercises-dir polyglot-benchmark 2>&1 | tee "$OUT_DIR/run.log" | tail -40
 
 stop_server
