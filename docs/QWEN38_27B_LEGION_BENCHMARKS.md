@@ -18,7 +18,7 @@
 | MTP costs **no measurable accuracy** (n=102/arm, p=0.59) | the speedup is effectively free |
 | **WSL2 ≈ native Windows** for fully-GPU-resident inference | within ±2% — no reason to migrate |
 | **Thinking mode** (`reasoning_effort=medium`) | **58.8% pass@2**, 26.5% pass@1 |
-| **Second attempt recovers 11/34 exercises** | pass@1 26.5% → **pass@2 58.8%** |
+| **pass@2 is ~2.2× pass@1 in both arms** | thinking 26.5%→**58.8%**, non-thinking 17.6%→**38.2%** |
 | Context is nearly free — only 16 of 64 layers hold a KV cache | 64k ctx costs ~2.5% decode |
 
 **Recommended daily driver:**
@@ -32,7 +32,7 @@
   --host 127.0.0.1 --port 8080
 ```
 → **~74 t/s, 14,704 MiB peak, 1.6 GiB headroom, 32k context, 58.8% pass@2.**
-Leave thinking ON: with thinking off, pass@1 falls to 20.6% (pooled n=102).
+Leave thinking ON: with thinking off, pass@2 falls 58.8% → 38.2%.
 
 ---
 
@@ -238,23 +238,29 @@ output is fed back into the same conversation and the model gets one chance to f
 leaderboard headlines `pass_rate_2`. Our harness was single-attempt until now; `--tries 2`
 implements the real protocol.
 
-| metric | result |
-|---|---:|
-| pass@1 (cold, no feedback) | 9/34 = **26.5%** |
-| **pass@2 (within two tries)** | 20/34 = **58.8%** |
+| arm | pass@1 | **pass@2** | recovered by the retry |
+|---|---:|---:|---:|
+| **thinking, `reasoning_effort=medium`** | 9/34 = 26.5% | **20/34 = 58.8%** | +11 |
+| non-thinking (`--reasoning-budget 0`) | 6/34 = 17.6% | **13/34 = 38.2%** | +7 |
 
-**The retry recovers 11 of 25 first-attempt failures** — pass@2 is more than double pass@1.
-Recovered: beer-song, book-store, bottle-song, food-chain, grade-school, list-ops, poker,
-proverb, sgf-parsing, simple-linked-list, zipper.
+**The single most important methodological point in this report: pass@2 is ~2.2× pass@1 in
+both arms.** A single-attempt score understates this model's practical coding ability by more
+than half, because most failures are near-misses that one round of test feedback repairs — and
+that is exactly how the model gets used in practice, since you paste the error back.
 
-That gap is the single most important methodological point in this report: a single-attempt
-score understates this model's practical coding ability by more than 2×, because most failures
-are near-misses that one round of test feedback fixes. It also matches how you actually use a
-coding model — you paste the error back.
+Thinking recovered 11 of 25 first-attempt failures: beer-song, book-store, bottle-song,
+food-chain, grade-school, list-ops, poker, proverb, sgf-parsing, simple-linked-list, zipper.
 
-Config: `reasoning_effort=medium`, thinking on, **no MTP**, 32k ctx, q8_0 KV, CUDA graphs off
-(see §10). Run across three legs due to machine reboots; `aider_lite` appends per-exercise
-JSONL so the merge is exact.
+**Statistical honesty.** Thinking leads on both metrics, but at n=34 per arm the pass@2 gap
+(58.8% vs 38.2%) is **z=1.70, p=0.089 — not significant at the 0.05 level.** The direction is
+consistent with the pass@1 result (26.5% vs a pooled non-thinking 20.6% over n=102, p=0.040),
+so thinking is very likely better, but this particular comparison is underpowered. Given the
+run-to-run spread this benchmark exhibits (a single config scored 14.7–29.4% across three
+runs), treat the pass@2 arms as "thinking is probably meaningfully better" rather than proven.
+
+Config for both arms: 32k ctx, q8_0 KV, `--parallel 1`, **no MTP**, CUDA graphs off (§10).
+The thinking arm ran across three legs due to machine reboots; `aider_lite` appends
+per-exercise JSONL so the merge is exact.
 
 ### Cross-machine comparison (same harness, same 34 Python exercises)
 
