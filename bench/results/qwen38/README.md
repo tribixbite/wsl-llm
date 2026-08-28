@@ -78,10 +78,31 @@ cd ~/llama.cpp && git pull origin master   # must include ece963f
 Thinking is ON by default; control with `reasoning_effort` = `xhigh`/`medium`/`low`/
 `none`. **Never greedy** (same guidance as prior Qwen gens).
 
-## Quality: aider polyglot (python subset, whole-file, single-attempt)
+## Quality: aider polyglot (python subset, whole-file)
 
-Same harness/protocol as `../qwen36-27b/aider-polyglot/README.md`. Served on the
+Same harness as `../qwen36-27b/aider-polyglot/README.md`. Served on the
 **Q6_K_XL dual-GPU + MTP** config above.
+
+### ⭐ Headline: pass@2 = 22/34 = 64.7%
+
+The aider leaderboard headlines **pass@2** (two tries, the second seeing the failing
+pytest output) — not pass@1. On the champion config
+(**Q6_K_XL dual-GPU + MTP + `reasoning_effort=medium`, `--tries 2`**):
+
+| metric | score |
+|---|---:|
+| pass@1 (first attempt) | 11/34 = 32.4% |
+| **pass@2 (leaderboard metric)** | **22/34 = 64.7%** |
+
+**The retry loop doubles the score (32.4 → 64.7).** Handing the model its own test
+failures is worth more than any sampling/thinking knob measured in this repo. Every
+single-attempt number below is therefore a *floor*, not a comparable leaderboard
+figure. Wall 3601 s for 34 exercises with 2 attempts.
+
+### Single-attempt (pass@1) comparison across models
+
+These runs used `--tries 1`; useful for model-vs-model comparison on equal terms,
+but **not** comparable to published aider leaderboard numbers.
 
 | Model / mode | pass@1 |
 |---|---:|
