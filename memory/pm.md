@@ -256,7 +256,11 @@ Full report: `docs/QWEN38_27B_LEGION_BENCHMARKS.md`.
 | config | pass@1 | |
 |---|---:|---|
 | non-thinking, pooled n=102 | 20.6% | |
-| **thinking (medium) + MTP** | **38.2%** | z=2.06, p=0.040 significant |
+| **thinking (medium) — pass@2** | **58.8%** (20/34) | aider leaderboard metric |
+| thinking (medium) — pass@1 | 26.5% (9/34) | |
+| non-thinking — pass@2 | 38.2% (13/34) | |
+| non-thinking — pass@1 | 17.6% (6/34) | |
+| thinking vs non-thinking pass@2 | 58.8% vs 38.2% | z=1.70 p=0.089, NOT significant at n=34 |
 | baseline vs MTP | 20.6% vs 17.6% | p=0.59 — MTP costs nothing |
 
 **Decisions taken:**
@@ -273,3 +277,21 @@ Full report: `docs/QWEN38_27B_LEGION_BENCHMARKS.md`.
 - Official aider-polyglot (diff format, multi-language) not run — only the whole-file Python subset.
 - ExLlamaV3 accuracy not measured (needs TabbyAPI for an OpenAI endpoint).
 - Ollama / LM Studio not benchmarked (both vendor llama.cpp).
+
+## Crash root cause (resolved 2026-08-28)
+
+Five bugchecks; `kd !analyze -v` on all five dumps:
+`nt` x3 (PpmEventAddAffinityMaskAsSubset / ExpPoolTrackerChargeEntry / RtlRaiseStatus,
+processes chrome+svchost+Registry) and `clipsp.sys` x2. Scattered subsystems and unrelated
+processes = **memory corruption**, not one driver.
+
+Hardware suspect: aftermarket **128 GB = 2 x 64 GB Crucial CT64G56C46S5.M16B1 DDR5-5600**,
+one per channel. Two dual-rank 64 GB SODIMMs at 5600 is a marginal load for Arrow Lake HX.
+No WHEA logged (no ECC on consumer SODIMMs). Windows Memory Diagnostic never run.
+
+Ruled out by experiment: VRAM 15.2->13.4 GiB, CUDA graphs off, thermal backoff (GPU never
+above 81 C, no thermal events). Crashes continued through all of it.
+
+User decision 2026-08-28: **leave it, keep benchmarking** (harness resumes per-exercise);
+`wsl --update` and NVIDIA driver update deferred — neither is the root cause.
+Recommended when convenient: MemTest86 from USB, then derate memory to 5200/4800 if it fails.

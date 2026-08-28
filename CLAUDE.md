@@ -29,6 +29,14 @@ nvidia-smi --query-gpu=name,compute_cap --format=csv,noheader
   **non-thinking** temp 0.7 / top_p 0.80 / presence_penalty 1.5. `reasoning_effort` is
   `xhigh` (default) | `medium` | `low` — `xhigh` costs ~220 s/exercise, use `medium`.
 - vLLM/SGLang are **not usable** for this model here: every 4-bit safetensors quant is 17.7–21.8 GiB.
+- **Report pass@2, not pass@1** — `bench/aider_lite.py --tries 2` (now the default) matches the
+  aider leaderboard by feeding pytest output back for a second attempt. It is worth ~2.2x:
+  thinking 26.5% -> **58.8%**, non-thinking 17.6% -> **38.2%**.
+- ⚠️ **This machine bugchecks randomly** — `nt` and `clipsp.sys` access violations across
+  unrelated subsystems/processes, i.e. memory corruption, almost certainly the aftermarket
+  2x64 GB DDR5-5600 kit (marginal for Arrow Lake HX). NOT caused by the GPU workload; it
+  predates it. Always checkpoint long runs — `aider_lite` appends per-exercise JSONL and
+  resumes exactly. See `docs/QWEN38_27B_LEGION_BENCHMARKS.md` §10.
 
 ---
 
