@@ -8,3 +8,6 @@
 {"name": "dot-dsl", "pass": false, "pass1": false, "pass2": false, "gen_s": 107.0}
 {"name": "food-chain", "pass": true, "pass1": false, "pass2": true, "gen_s": 118.5}
 {"name": "forth", "pass": false, "pass1": false, "pass2": false, "gen_s": 154.3}
+{"name": "go-counting", "pass": false, "pass1": false, "pass2": false, "gen_s": 101.1}
+{"name": "grade-school", "pass": true, "pass1": false, "pass2": true, "gen_s": 48.8}
+{"name": "grep", "pass": false, "pass1": false, "pass2": false, "gen_s": 83.9}

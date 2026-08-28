@@ -1,0 +1,1 @@
+think_med_t2_resume|-c 32768 -ctk q8_0 -ctv q8_0 --parallel 1 --reasoning-effort medium|--think --exercises hangman,list-ops,paasio,phone-number,pig-latin,poker,pov,proverb,react,rest-api,robot-name,scale-generator,sgf-parsing,simple-linked-list,transpose,tree-building,two-bucket,variable-length-quantity,wordy,zebra-puzzle,zipper --cooldown 20 --temp-max 72 --temp-resume 65

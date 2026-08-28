@@ -8,3 +8,6 @@
 [8/34] dot-dsl                  FAIL    (107s)  …1 failed, 6 passed in 0.15s
 [9/34] food-chain               PASS@2  (119s)
 [10/34] forth                    FAIL    (154s)  …TIMEOUT: the test run exceeded 120s (likely an infinite loop).
+[11/34] go-counting              FAIL    (101s)  …1 error in 0.19s
+[12/34] grade-school             PASS@2  (49s)
+[13/34] grep                     FAIL    (84s)  …1 failed, 1 passed in 0.15s

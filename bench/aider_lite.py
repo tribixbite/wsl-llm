@@ -94,6 +94,43 @@ RETRY_TEMPLATE = (
 )
 
 
+def gpu_temp():
+    """Current GPU temperature in C, or None if nvidia-smi is unavailable."""
+    try:
+        r = subprocess.run(["nvidia-smi", "--query-gpu=temperature.gpu",
+                            "--format=csv,noheader"],
+                           capture_output=True, text=True, timeout=15)
+        return int(r.stdout.strip().splitlines()[0])
+    except Exception:
+        return None
+
+
+def thermal_pause(temp_max, resume_below, cooldown, max_wait=600):
+    """Idle between exercises so a laptop chassis can shed heat.
+
+    Always waits `cooldown` seconds, then keeps waiting while the GPU is above
+    `temp_max` until it drops under `resume_below` (or `max_wait` elapses).
+    Sustained back-to-back generation is what cooks a laptop; a few seconds of
+    idle per exercise costs little against 60-900 s of inference.
+    """
+    if cooldown:
+        time.sleep(cooldown)
+    if not temp_max:
+        return
+    waited = 0
+    t = gpu_temp()
+    if t is None or t <= temp_max:
+        return
+    print(f"    [thermal] GPU {t}C > {temp_max}C — pausing until <{resume_below}C", flush=True)
+    while waited < max_wait:
+        time.sleep(15)
+        waited += 15
+        t = gpu_temp()
+        if t is None or t < resume_below:
+            break
+    print(f"    [thermal] resumed at {t}C after {waited}s", flush=True)
+
+
 def attempt(url, model, key, messages, ex_dir, name, py, max_tokens, think, effort=None):
     """One model call + test run. Returns (ok, test_output, reply_text, seconds)."""
     started = time.time()
@@ -114,6 +151,12 @@ def main():
     ap.add_argument("--think", action="store_true", help="enable_thinking:true (needs server reasoning-budget>0)")
     ap.add_argument("--effort", default=None, help="Qwen3.8+ reasoning_effort: xhigh|medium|low|none")
     ap.add_argument("--max-tokens", type=int, default=0, help="0=auto (3000, or 20000 with --think)")
+    ap.add_argument("--cooldown", type=float, default=0,
+                    help="seconds to idle between exercises (laptop thermal relief)")
+    ap.add_argument("--temp-max", type=int, default=0,
+                    help="if GPU exceeds this C after an exercise, pause until it cools")
+    ap.add_argument("--temp-resume", type=int, default=70,
+                    help="resume once GPU drops below this C (with --temp-max)")
     ap.add_argument("--tries", type=int, default=2,
                     help="attempts per exercise; 2 matches the official aider benchmark "
                          "(test output fed back on failure). 1 = legacy single-attempt.")
@@ -162,6 +205,9 @@ def main():
         if args.out:
             with open(args.out + ".jsonl", "a") as f:
                 f.write(json.dumps(rec) + "\n")
+
+        if i < len(names):
+            thermal_pause(args.temp_max, args.temp_resume, args.cooldown)
 
     n = len(results)
     p1 = sum(r["pass1"] for r in results)
