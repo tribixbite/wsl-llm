@@ -2,3 +2,20 @@
 [2/34] beer-song                FAIL    (281s)  …1 failed in 0.27s
     [thermal] GPU 76C > 74C — pausing until <66C
     [thermal] resumed at 77C after 600s
+[3/34] book-store               FAIL    (328s)  …1 failed in 0.27s
+    [thermal] GPU 76C > 74C — pausing until <66C
+    [thermal] resumed at 65C after 285s
+[4/34] bottle-song              FAIL    (0s)  …CALL_ERR URLError(ConnectionRefusedError(111, 'Connection refused'))
+[5/34] bowling                  FAIL    (0s)  …CALL_ERR URLError(ConnectionRefusedError(111, 'Connection refused'))
+[6/34] connect                  FAIL    (0s)  …CALL_ERR URLError(ConnectionRefusedError(111, 'Connection refused'))
+[7/34] dominoes                 FAIL    (0s)  …CALL_ERR URLError(ConnectionRefusedError(111, 'Connection refused'))
+[8/34] dot-dsl                  FAIL    (0s)  …CALL_ERR URLError(TimeoutError(110, 'Connection timed out'))
+[9/34] food-chain               FAIL    (0s)  …CALL_ERR URLError(TimeoutError(110, 'Connection timed out'))
+    [thermal] GPU 75C > 74C — pausing until <66C
+    [thermal] resumed at 63C after 75s
+[10/34] forth                    FAIL    (0s)  …CALL_ERR URLError(TimeoutError(110, 'Connection timed out'))
+[11/34] go-counting              FAIL    (0s)  …CALL_ERR URLError(TimeoutError(110, 'Connection timed out'))
+[12/34] grade-school             FAIL    (0s)  …CALL_ERR URLError(TimeoutError(110, 'Connection timed out'))
+[13/34] grep                     FAIL    (0s)  …CALL_ERR URLError(TimeoutError(110, 'Connection timed out'))
+[14/34] hangman                  FAIL    (0s)  …CALL_ERR URLError(TimeoutError(110, 'Connection timed out'))
+[15/34] list-ops                 FAIL    (0s)  …CALL_ERR URLError(TimeoutError(110, 'Connection timed out'))

@@ -389,3 +389,76 @@ update are worthwhile hygiene but do **not** address this.
 **Why it did not cost us the results:** `aider_lite.py` appends one JSONL record per exercise,
 so a killed run resumes exactly where it died. The 34-exercise thinking run completed across
 three legs and merged exactly. Any long run on this machine should be checkpointed the same way.
+
+
+---
+
+## 11. Quantization damage: KL-divergence vs a Q8_0 reference
+
+Reference: `Qwen3.8-27B-Q8_0.gguf` (27.05 GiB, partially CPU-offloaded since it exceeds 16 GB).
+wikitext-2 test, `-c 512 --chunks 100`, `-fa on`, seed 1337. Q8_0's own KLD to FP16 is ~0.0014,
+a few percent of what is measured here, so it is a defensible stand-in for BF16 (50.9 GiB, won't fit).
+
+**Q8_0 reference PPL = 6.7480 ± 0.1031.**
+
+| metric (vs Q8_0) | **V3** (24× 2-bit tensors, 12.24 GiB) | **408fcc18** (0× 2-bit, 12.52 GiB) | better |
+|---|---:|---:|---|
+| Mean PPL(Q) | 6.8421 | 6.8810 | **V3** |
+| PPL(Q)/PPL(base) | **1.0139** | 1.0197 | **V3** |
+| **Mean KLD** | **0.02484 ± 0.00049** | 0.02710 ± 0.00044 | **V3** |
+| Median KLD | **0.01066** | 0.01222 | **V3** |
+| 90% KLD | **0.05094** | 0.05550 | **V3** |
+| 95% KLD | **0.08239** | 0.09201 | **V3** |
+| 99% KLD | **0.24983** | 0.27338 | **V3** |
+| 99.9% KLD | 0.90142 | **0.86048** | 408 |
+| Maximum KLD | 5.9301 | **3.6762** | 408 |
+| RMS Δp | **4.452 ± 0.099 %** | 4.739 ± 0.095 % | **V3** |
+| **Same top-1 token** | **93.145 ± 0.158 %** | 92.757 ± 0.162 % | **V3** |
+
+### The community complaint about Dynamic V3 is not supported
+
+Users reported the V3 rebuild as "sloppier, more error-prone while coding" because it introduced
+**24 tensors in 2-bit classes covering 7.33% of parameters** (which we verified directly in the
+file). Measured against a Q8_0 reference, the opposite holds:
+
+- **V3 tracks the reference better at every percentile from 0.1% through 99%**, on the mean, on
+  RMS Δp, and on same-top-1-token agreement. The mean-KLD gap (0.0248 vs 0.0271, ~9%) is well
+  outside the error bars.
+- 408fcc18 wins **only in the extreme tail** — max KLD 3.68 vs 5.93, and 99.9% KLD. So V3 does
+  suffer occasional larger single-token divergences, which is presumably what users noticed, but
+  its typical-case fidelity is better.
+- V3 is also **0.28 GiB smaller and ~17–30% faster to decode** (§12).
+
+For context, llama.cpp's own Llama-3-8B scoreboard puts imatrix `q4_K_M` at mean KLD 0.0282 and
+`q3_K_M` at 0.0844. **This 3-bit-class quant lands at 0.0248 — better than the q4_K_M reference
+band**, which is what Unsloth's dynamic per-tensor mixing plus imatrix calibration buys.
+
+**Recommendation: use the current `UD-Q3_K_XL`.** Do not pin `408fcc18` — it is larger, slower,
+and measurably further from the reference in the typical case.
+
+---
+
+## 12. The two Q3_K_XL revisions differ in speed, not just size
+
+| | V3 | 408fcc18 |
+|---|---:|---:|
+| size | 12.24 GiB | 12.52 GiB |
+| decode t/s (median, non-thinking) | **34.6** | 28.8 |
+| generation length (median tokens) | **620** | 1131 |
+| responses hitting the 3000-token cap | 2/62 (3%) | 4/23 (17%) |
+
+Cause is the tensor-type mix, not size:
+
+| dtype share | V3 | 408fcc18 |
+|---|---:|---:|
+| IQ4_XS | 34.3% | 48.0% |
+| IQ3_S | 30.1% | 42.4% |
+| K-quants (Q3_K/Q4_K/Q5_K/Q6_K/Q8_0) | 19.5% | 9.6% |
+| 2-bit i-quants | 7.3% | 0% |
+
+408fcc18 is **90.4% i-quant**. I-quants dequantize through codebooks and are slower on CUDA than
+K-quants, so the revision that avoids 2-bit tensors pays for it in throughput. Chat templates are
+byte-identical between the two (sha1 `a7e79f8fe37f381c`), ruling that out as a confound.
+
+The 408 revision was also markedly more verbose — on `rust/forth` it failed to converge within
+35 minutes where V3 finished the same exercise in 232 s (both failing the tests).
