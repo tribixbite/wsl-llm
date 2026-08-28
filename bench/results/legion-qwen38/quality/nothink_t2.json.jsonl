@@ -31,3 +31,4 @@
 {"name": "variable-length-quantity", "pass": true, "pass1": true, "pass2": true, "gen_s": 12.2}
 {"name": "wordy", "pass": false, "pass1": false, "pass2": false, "gen_s": 50.9}
 {"name": "zebra-puzzle", "pass": true, "pass1": false, "pass2": true, "gen_s": 3.2}
+{"name": "zipper", "pass": false, "pass1": false, "pass2": false, "gen_s": 94.5}

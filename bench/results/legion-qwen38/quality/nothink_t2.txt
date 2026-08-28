@@ -31,3 +31,10 @@
 [31/34] variable-length-quantity PASS    (12s)
 [32/34] wordy                    FAIL    (51s)  …1 failed, 19 passed in 0.15s
 [33/34] zebra-puzzle             PASS@2  (3s)
+[34/34] zipper                   FAIL    (94s)  …1 failed, 5 passed in 0.15s
+
+=== qwen3.8-27b-nothink_t2 (whole-file, python subset, tries=2)
+    pass@1 = 6/34 = 17.6%
+    pass@2 = 13/34 = 38.2%   <- aider leaderboard headline metric
+    wall=2093s
+    wrote /home/will/git/wsl-llm/bench/results/legion-qwen38/quality/nothink_t2.json
