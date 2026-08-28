@@ -338,35 +338,48 @@ laptop Blackwell; none occurred here across hours of runs, and graphs are worth 
 
 ---
 
-## 10. Machine stability — a pre-existing kernel driver fault
+## 10. Machine stability — memory corruption, not a driver or the workload
 
-This box bugchecked **four times** during the benchmark work. It is worth recording precisely,
-because it is *not* caused by the workload and it wasted several hours.
+This box bugchecked **five times** (twice before this work began). Symbol resolution via
+`kd.exe -z <dump> -c "!analyze -v"` on all five dumps:
 
-| time | bugcheck | faulting address |
-|---|---|---|
-| 8/27 4:58 PM | 0x1E KMODE_EXCEPTION_NOT_HANDLED | `0xfffff806ea`**`b96710`** |
-| 8/27 7:40 PM | 0x1E | `0xfffff804794b11df` |
-| 8/27 8:47 PM | 0x3B SYSTEM_SERVICE_EXCEPTION | `0xfffff803dc`**`f96710`** |
-| 8/27 9:50 PM | 0x3B | `0xfffff803cf5`**`96710`** |
+| dump | bugcheck | module | process | failure bucket |
+|---|---|---|---|---|
+| 8/12 5:59 AM | 0x1E | `nt` | chrome.exe | `AV_R_nt!PpmEventAddAffinityMaskAsSubset` |
+| 8/27 4:58 PM | 0x1E | `nt` | svchost.exe | `AV_nt!ExpPoolTrackerChargeEntry` |
+| 8/27 7:40 PM | 0x1E | `nt` | Registry | `AV_R_nt!RtlRaiseStatus` |
+| 8/27 8:47 PM | 0x3B | `clipsp` | svchost.exe | `AV_clipsp!unknown_function` |
+| 8/27 9:50 PM | 0x3B | `clipsp` | svchost.exe | `AV_clipsp!unknown_function` |
 
-All four are `0xC0000005` (access violation) in kernel mode, and **three share the low offset
-`96710`** — the same instruction in the same driver, at different KASLR bases.
+**Diagnosis: memory corruption.** Access violations scattered across unrelated kernel
+subsystems (power management, pool tracking, exception dispatch, licensing) hitting unrelated
+processes (chrome, svchost, Registry) is the signature of bad memory, not one buggy driver.
 
-**Evidence it is not thermal and not our VRAM pressure:**
-- No WHEA or thermal-trip events logged; GPU peaked at 76–81 °C, well inside spec.
-- The same 0x1E bugcheck occurred on **8/11 and 8/12**, before any of this work.
-- Crashes continued after we (a) dropped peak VRAM from 15.2 GiB to 13.4 GiB, (b) disabled
-  CUDA graphs, and (c) added thermal backoff plus a 20 s inter-exercise cooldown.
+**The hardware is the prime suspect.** This laptop carries an aftermarket **128 GB kit — two
+64 GB Crucial `CT64G56C46S5.M16B1` DDR5 SODIMMs at 5600 MT/s**, one per channel. Two
+*dual-rank* 64 GB modules at full 5600 is a marginal load for an Arrow Lake HX memory
+controller, which typically wants a derate to 5200 or 4800 at that population.
 
-**Practical mitigations used** (they did not stop the crashes, but they made them cheap):
-`aider_lite.py` appends one JSONL record per exercise, so a run resumes exactly where it died.
-The 34-exercise thinking run completed across three legs this way. `--cooldown`,
-`--temp-max`/`--temp-resume` were added for pacing.
+Corroborating: **no WHEA errors are logged** — consumer SODIMMs have no ECC, so corruption is
+silent and surfaces as random access violations rather than recorded hardware faults. Windows
+Memory Diagnostic has never been run on this machine.
 
-**Recommended fixes, in order:**
-1. **`wsl --update`** — this host runs WSL **2.4.13**; **2.7.0** fixed Blackwell CUDA-graph
-   capture ([WSL#14452](https://github.com/microsoft/WSL/issues/14452)). Still not applied.
-2. Update or roll back the NVIDIA driver (currently 610.57.01 / KMD 610.88).
-3. Analyse the minidumps to name the driver: `C:\Windows\Minidump\082726-*.dmp`
-   (`!analyze -v` in WinDbg). Four dumps from 8/11, 8/12 and two from 8/27 are present.
+**Ruled out by experiment.** Crashes continued after every one of these:
+- peak VRAM cut from 15.2 GiB to 13.4 GiB (WDDM eviction pressure)
+- CUDA graphs disabled (`GGML_CUDA_DISABLE_GRAPHS=1`)
+- thermal backoff plus a 20 s inter-exercise cooldown; GPU never exceeded 81 C
+- no WHEA/thermal-trip events at any point
+
+> **Correction.** An earlier revision of this document claimed three crashes faulted at the
+> same instruction because their addresses shared the low digits `96710`. Symbol resolution
+> disproves that: they are in different modules and different functions. The shared digits
+> were coincidence. The conclusion "one repeating driver bug" was wrong.
+
+**Recommended, in order:** MemTest86 from USB (Windows' own diagnostic is too weak for
+marginal timing faults) → if it fails, derate memory to 5200/4800 in BIOS. `wsl --update`
+(this host is on **2.4.13**; 2.7.0 carries Blackwell CUDA-graph fixes) and an NVIDIA driver
+update are worthwhile hygiene but do **not** address this.
+
+**Why it did not cost us the results:** `aider_lite.py` appends one JSONL record per exercise,
+so a killed run resumes exactly where it died. The 34-exercise thinking run completed across
+three legs and merged exactly. Any long run on this machine should be checkpointed the same way.
