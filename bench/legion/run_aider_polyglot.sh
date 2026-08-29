@@ -66,6 +66,9 @@ export OPENAI_API_BASE="http://127.0.0.1:$PORT/v1"
 export OPENAI_API_KEY="dummy"
 export AIDER_MODEL_SETTINGS_FILE=/dev/null
 export AIDER_ANALYTICS=false
+# npm-test.sh (de-containerised by setup_aider_multilang.sh) reads this to
+# find the shared node_modules the JS exercises need.
+export NPM_INSTALL_DIR="${NPM_INSTALL_DIR:-$HOME/npm-install}"
 
 "$HOME/aiderbench/bin/python" benchmark/benchmark.py "$RUN_NAME" \
   --model "openai/qwen3.8-27b" \

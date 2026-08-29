@@ -22,3 +22,13 @@
 {"name": "react", "pass": false, "pass1": false, "pass2": false, "gen_s": 0.0}
 {"name": "rest-api", "pass": false, "pass1": false, "pass2": false, "gen_s": 0.0}
 {"name": "robot-name", "pass": false, "pass1": false, "pass2": false, "gen_s": 0.0}
+{"name": "scale-generator", "pass": false, "pass1": false, "pass2": false, "gen_s": 0.0}
+{"name": "sgf-parsing", "pass": false, "pass1": false, "pass2": false, "gen_s": 0.0}
+{"name": "simple-linked-list", "pass": false, "pass1": false, "pass2": false, "gen_s": 0.0}
+{"name": "transpose", "pass": false, "pass1": false, "pass2": false, "gen_s": 0.0}
+{"name": "tree-building", "pass": false, "pass1": false, "pass2": false, "gen_s": 0.0}
+{"name": "two-bucket", "pass": false, "pass1": false, "pass2": false, "gen_s": 0.0}
+{"name": "variable-length-quantity", "pass": false, "pass1": false, "pass2": false, "gen_s": 0.0}
+{"name": "wordy", "pass": false, "pass1": false, "pass2": false, "gen_s": 0.0}
+{"name": "zebra-puzzle", "pass": false, "pass1": false, "pass2": false, "gen_s": 0.0}
+{"name": "zipper", "pass": false, "pass1": false, "pass2": false, "gen_s": 0.0}
