@@ -1,0 +1,19 @@
+[Unit]
+Description=Qwen3.8-27B vision endpoint (llama.cpp + mmproj, MTP spec-decode)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=matilda
+Group=matilda
+ExecStart=/home/matilda/git/wsl-llm/scripts/serve-qwen38-vision.sh
+Restart=on-failure
+RestartSec=15
+TimeoutStartSec=600
+KillSignal=SIGTERM
+KillMode=mixed
+Environment=CUDA_VISIBLE_DEVICES=1
+
+[Install]
+WantedBy=multi-user.target
