@@ -240,3 +240,31 @@ Harness: `bench/aider_multi.py` (python/javascript/java). JS needed a babel fix 
 presets cannot resolve through a symlinked `node_modules`, so the runner rewrites
 `babel.config.js` with `require.resolve`. **Before that fix JS scored a false 0%**,
 which would have inverted this conclusion.
+
+## DFlash2 — dead end on vLLM 0.28 (needs 0.27.1)
+
+The syv-ai repo claims ~130 t/s with `SPEC=dflash2` (vs ~116 MTP). It does not work
+on vLLM 0.28. Three blockers, peeled in order — the first two are fixable, the third
+is not:
+
+1. **`SPEC=dflash2` in `.env` is silently ignored on the venv path.** `.env` is read
+   by *docker compose* only. The server starts, logs no error, and quietly runs MTP
+   (`'method': 'mtp'`). Export it as a real env var instead.
+2. **`RuntimeError: UVA is not available`** — WSL2's GPU-PV does not expose Unified
+   Virtual Addressing. Fixed by `VLLM_WSL2_ENABLE_PIN_MEMORY=1` (the repo ships this
+   flag for exactly this case); after it, `'method': 'dflash'` and no UVA error.
+3. **`AttributeError: 'QKVParallelLinear' object has no attribute 'weight'`** at
+   engine init. The DFlash2 code does `a.qkv_proj.weight[a.q_size:]`, but W4A16
+   quantized layers expose `qweight`/`scales`, not `.weight`. The patches are
+   "written against 0.27.1" and that layer structure changed. **Not fixable without
+   downgrading vLLM to 0.27.1 and re-applying all 19 patches.**
+
+Verdict: not worth trading a verified 105 t/s stack for an unverified one, given
+105 t/s / 73.0% pass@2 already clears the goal. The launch line that gets furthest,
+if anyone retries on 0.27.1:
+
+```bash
+cd ~/qwen38-vllm && SPEC=dflash2 PREFIX_CACHE=1 VLLM_WSL2_ENABLE_PIN_MEMORY=1 \
+  MODEL=~/qwen38-vllm/models2/Qwen3.8-27B-W4A16-AutoRound MAX_SEQS=1 \
+  bash single-user/start_qwen.sh
+```
