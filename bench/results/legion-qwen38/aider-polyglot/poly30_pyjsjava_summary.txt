@@ -1,0 +1,26 @@
+───── /home/will/aider/tmp.benchmarks/2026-08-28-23-50-25--poly30-pyjsjava ─────
+- dirname: 2026-08-28-23-50-25--poly30-pyjsjava
+  test_cases: 30
+  model: openai/qwen3.8-27b
+  edit_format: diff
+  commit_hash: 5dc9490-dirty
+  pass_rate_1: 26.7
+  pass_rate_2: 66.7
+  pass_num_1: 8
+  pass_num_2: 20
+  percent_cases_well_formed: 96.7
+  error_outputs: 1
+  num_malformed_responses: 1
+  num_with_malformed_responses: 1
+  user_asks: 0
+  lazy_comments: 0
+  syntax_errors: 0
+  indentation_errors: 0
+  exhausted_context_windows: 0
+  prompt_tokens: 241478
+  completion_tokens: 139242
+  test_timeouts: 0
+  total_tests: 225
+  command: aider --model openai/qwen3.8-27b
+  date: 2026-08-28
+  versions: 0.86.3.dev

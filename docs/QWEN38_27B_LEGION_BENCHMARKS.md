@@ -530,3 +530,49 @@ invocation tests a different random N**. Our first quant A/B overlapped on only 
 exercises and was discarded. Pin the set with `--keywords` (see `KEYWORDS` in
 `bench/legion/run_aider_polyglot.sh` and `bench/legion/poly30_exercise_set.txt`) before comparing
 any two runs.
+
+
+---
+
+## 15. Polyglot in diff format — Python / JavaScript / Java
+
+30 exercises, `--edit-format diff`, `--tries 2`, thinking at `reasoning_effort=medium`.
+
+> **Kotlin and TypeScript are not available.** The aider polyglot set ships exactly six
+> languages — cpp, go, java, javascript, python, rust — with no Kotlin and no TypeScript, and
+> `kotlinc` is not installed on this box. **Java is substituted as the closest JVM/Gradle
+> analogue**; JavaScript covers the JS-family request.
+
+| language | n | pass@1 | **pass@2** | malformed |
+|---|---:|---:|---:|---:|
+| python | 8 | 12.5% | **75.0%** | 0 |
+| java | 9 | 22.2% | **66.7%** | 0 |
+| javascript | 13 | 38.5% | **61.5%** | 1 |
+| **total** | **30** | **26.7%** (8/30) | **66.7%** (20/30) | 1 |
+
+Aggregate: `percent_cases_well_formed` **96.7%**, 0 syntax errors, 0 lazy comments,
+0 exhausted context windows, 0 test timeouts, 148.5 s/case.
+
+### Compared with the Python/Go/Rust run (§14)
+
+| set | pass@1 | pass@2 | well-formed |
+|---|---:|---:|---:|
+| python/go/rust | 46.7% | 63.3% | 100.0% |
+| **python/javascript/java** | 26.7% | **66.7%** | 96.7% |
+
+Similar pass@2, but a very different route to it: the py/js/java mix starts far weaker
+(26.7% vs 46.7% first-attempt) and the retry recovers **+40 points** versus +16.6 for
+py/go/rust. In other words the model's *first* draft in JS/Java is often wrong, but it
+repairs it reliably once it sees the test output — further evidence that pass@1 badly
+misrepresents this model.
+
+Recovered on the second attempt: python +5 (grep, hangman, scale-generator, wordy, zipper),
+java +4 (protein-translation, react, twelve-days, zipper), javascript +3
+(parallel-letter-frequency, promises, queen-attack).
+
+**Caveats.** Per-language n is 8–13, so the per-language rates carry wide error bars and the
+ordering between them is not meaningful — only the aggregate is. The language split is uneven
+because `benchmark.py` shuffles unseeded (§14). The single malformed response was in JavaScript.
+
+Running JS and Java outside Docker required de-containerising two hardcoded paths — see
+`bench/legion/setup_aider_multilang.sh`.
