@@ -77,6 +77,15 @@ if ($Mode -in @('both', 'vision')) {
 if ($NoThinking) { $srvArgs += @('--reasoning-budget', '0') }
 else             { $srvArgs += @('--reasoning-effort', 'medium') }
 
+# Autostart can fire more than once (logon + manual run). A second llama-server
+# would try to allocate another ~14 GB and take the whole GPU down with it, so
+# bail out if the port is already served.
+$busy = Test-NetConnection -ComputerName 127.0.0.1 -Port $Port -InformationLevel Quiet -WarningAction SilentlyContinue
+if ($busy) {
+    Write-Host "  port $Port is already listening - another server is up; exiting."
+    exit 0
+}
+
 $expect = switch ($Mode) {
     'both'   { 'MTP + vision  (~75 t/s text, images supported)' }
     'fast'   { 'MTP only      (~75 t/s, no images)' }
@@ -88,8 +97,14 @@ Write-Host "  Qwen3.8-27B  ->  $expect"
 Write-Host "  context $Ctx | OpenAI endpoint: http://127.0.0.1:$Port/v1"
 Write-Host ""
 & nvidia-smi --query-gpu=name,enforced.power.limit,memory.used --format=csv,noheader
-Write-Host "  (if the power limit is not 175 W, press Fn+Q for Performance mode:"
-Write-Host "   it is worth +32% decode and +42% prefill)"
+Write-Host "  (starts at any power limit. 175 W via Fn+Q is worth +32% decode /"
+Write-Host "   +42% prefill, but a lower TGP just runs slower - it never blocks.)"
 Write-Host ""
 
-& $exe @srvArgs
+# llama-server writes ALL of its logging to stderr. Under output redirection
+# (as the scheduled task does) PowerShell turns native stderr into error
+# records, and with ErrorActionPreference='Stop' the very first log line becomes
+# a terminating error — the task then exits 0x1 having produced nothing. Drop
+# back to 'Continue' and fold stderr into stdout so it just lands in the log.
+$ErrorActionPreference = 'Continue'
+& $exe @srvArgs 2>&1

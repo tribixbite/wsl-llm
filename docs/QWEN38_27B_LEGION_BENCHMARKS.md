@@ -677,3 +677,46 @@ Both take `-Mode`/`--mode` of `both` (default, MTP+vision), `fast` (MTP only, 32
 ```bash
 ./scripts/serve-qwen38.sh --mode fast --ctx 32768
 ```
+
+
+---
+
+## 19. Autostart on Windows (no WSL in the loop)
+
+Everything the server needs already lives on `C:\` — `llama-server.exe` plus 33 CUDA DLLs in
+`C:\llm\bin`, and all three GGUFs in `C:\llm\models`. **WSL is not involved at runtime**; only
+the canonical copy of the scripts lives in this repo.
+
+```powershell
+copy windows\start-qwen38.ps1     C:\llm\
+copy windows\install-autostart.ps1 C:\llm\
+cd C:\llm ; .\install-autostart.ps1            # register
+.\install-autostart.ps1 -Status                 # check
+.\install-autostart.ps1 -Uninstall              # remove
+```
+
+**A Scheduled Task, not the Startup folder**, because the task gives us: no console window, a
+start delay so the NVIDIA driver has settled before we claim ~14 GB, automatic restart if the
+server dies (this machine bugchecks at random — §10), and no dependence on a shell staying open.
+
+It registers as a **logon** task running in the interactive session deliberately. "Run whether
+user is logged on or not" executes in session 0, where CUDA under WDDM is unreliable.
+
+Defaults: runs on battery and keeps running when unplugged (`-NoBattery` to opt out), and it
+never gates on the GPU's power limit — it serves at whatever TGP the machine is in. Performance
+mode is worth +32% decode, but a lower TGP just runs slower.
+
+Verified end-to-end by killing the server and starting it *through the task*: up in ~20 s,
+14,472 MiB, **88.6 t/s** decode, both vision probes passing.
+
+### Two traps worth remembering
+
+1. **`$args` is a reserved automatic variable** in PowerShell advanced functions. Assigning to it
+   makes the script fail silently with an empty log.
+2. **llama-server writes all logging to stderr.** Under the task's output redirection PowerShell
+   converts native stderr into error records, and with `$ErrorActionPreference = 'Stop'` the very
+   first log line becomes a terminating error — the task exits `0x1` having produced nothing.
+   `start-qwen38.ps1` drops to `Continue` and folds stderr into stdout right before launching.
+
+A double-launch guard is also built in: if the port is already listening the script exits 0
+rather than starting a second server and taking the GPU down.

@@ -80,8 +80,8 @@ echo "  context $CTX | OpenAI endpoint: http://127.0.0.1:$PORT/v1"
 nvidia-smi --query-gpu=name,enforced.power.limit,memory.used --format=csv,noheader
 lim=$(nvidia-smi --query-gpu=enforced.power.limit --format=csv,noheader | tr -dc '0-9.' | cut -d. -f1)
 if [[ -n "$lim" && "$lim" -lt 150 ]]; then
-  echo "  !! power limit is ${lim} W, not 175 W — press Fn+Q for Performance mode"
-  echo "     (worth +32% decode and +42% prefill)"
+  echo "  note: power limit is ${lim} W, not 175 W. Fn+Q (Performance) is worth"
+  echo "        +32% decode / +42% prefill. Starting anyway - low TGP is only slower."
 fi
 echo
 
