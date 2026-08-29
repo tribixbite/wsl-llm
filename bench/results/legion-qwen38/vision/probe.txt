@@ -1,0 +1,25 @@
+
+=== probe.png — PASS ===
+  prompt_tokens=267 (image dominates)  completion_tokens=25  wall=1.3s  decode~19.0 t/s
+  matched optional 6/6: ['red', 'blue', 'green', 'circle', 'square', 'triangle']
+  --- answer ---
+  LEGION-5080
+  QX-7741
+  red circle, blue square, green triangle
+
+=== chart.png — PASS ===
+  prompt_tokens=299 (image dominates)  completion_tokens=74  wall=2.6s  decode~28.2 t/s
+  matched optional 5/5: ['38', '44', 'MTP', 'exllamav3', 'llama.cpp']
+  --- answer ---
+  Based on the bar chart provided, here are the labels and their corresponding values for decode tokens/sec:
+  
+  - **llama.cpp**: 38
+  - **exllamav3**: 44
+  - **llama+MTP**: 75
+  
+  The highest value is **75**, which corresponds to **llama+MTP**.
+
+=== sustained vision decode ===
+  prompt_tokens=311  completion_tokens=700  wall=18.1s  decode~38.6 t/s
+
+=== VISION OK ===

@@ -576,3 +576,59 @@ because `benchmark.py` shuffles unseeded (§14). The single malformed response w
 
 Running JS and Java outside Docker required de-containerising two hardcoded paths — see
 `bench/legion/setup_aider_multilang.sh`.
+
+
+---
+
+## 16. Throughput actually observed in the benchmark runs
+
+Measured from `llama-server` timings across the 30-exercise polyglot run (thinking at
+`reasoning_effort=medium`, 32k ctx, q8_0 KV, `--parallel 1`, **no MTP**):
+
+| | median | mean | range |
+|---|---:|---:|---|
+| **decode** | **38.40 t/s** | 38.05 | 35.1 – 39.2 |
+| **prefill** | **1121 t/s** | 1108 | — |
+
+Prompt tokens: median 2346, max 16,374, total 318,087. Generated: median 654/response,
+total 159,364. Decode is remarkably tight (σ ≈ 1 t/s) once the GPU is at 175 W.
+
+Add the MTP draft head and decode goes to **~75 t/s (85 on code)** — but see §17 for why you
+cannot have MTP and vision at the same time.
+
+---
+
+## 17. Vision works through the ordinary OpenAI endpoint
+
+Qwen3.8-27B is natively multimodal and Unsloth ships `mmproj-F16.gguf` (0.86 GiB). Serving it
+needs only `--mmproj`; images then go through standard `/v1/chat/completions` `image_url`
+content parts (base64 data URI or URL), so any OpenAI-compatible client works unchanged.
+
+```bash
+llama-server -m Qwen3.8-27B-UD-Q3_K_XL.gguf \
+  --mmproj mmproj-F16.gguf \
+  -ngl 99 -fa on -c 16384 -ctk q8_0 -ctv q8_0 --parallel 1 --jinja
+```
+
+**Verified against images with known ground truth** (`bench/legion/vision_probe.py`) rather than
+by eyeballing plausible-looking prose:
+
+| probe | result |
+|---|---|
+| OCR + shapes (`probe.png`) | **PASS** — returned heading `LEGION-5080`, serial `QX-7741`, and "red circle, blue square, green triangle" (6/6 colour+shape terms) |
+| Bar chart (`chart.png`) | **PASS** — read all three bars (llama.cpp 38, exllamav3 44, llama+MTP 75) and identified the highest |
+
+| measurement | value |
+|---|---:|
+| VRAM at 16k ctx + mmproj | **13,960 MiB** (≈2.0 GiB slack) |
+| image cost | **~250 prompt tokens** for 640×360 (spatial_merge_size 2 keeps this cheap) |
+| sustained decode with an image in context | **38.6 t/s** |
+
+**Vision costs prefill, not decode** — 38.6 t/s with an image is the same as the 38.4 t/s
+text-only median. The image is encoded once into ~250 tokens and then decoding proceeds normally.
+
+### ⚠️ Vision and MTP are mutually exclusive on 16 GB
+weights 12.24 + mmproj 0.86 + KV ≈ 14.0 GiB at 16k. Adding the 1.28 GiB MTP draft head on top
+lands at ~15.2 GiB, inside the WDDM eviction band that cost us a ~700× collapse (§3a). **Pick
+one:** MTP for ~75 t/s text-only, or vision at ~38 t/s. Dropping to `-c 8192` or `q4_0` KV does
+not buy back enough to fit both safely.
