@@ -216,3 +216,27 @@ because it reuses our existing stack and both quants were already downloaded.
 |---|---|
 | `tps.tsv` | Raw streaming decode-TPS rows for all three configs |
 | `aider_q38_q6.json` | Aider polyglot (python subset) score — see `../qwen36-27b/aider-polyglot/README.md` for protocol + Qwen 3.6 comparison |
+
+## ⭐ Multi-language pass@2 — the real number: 73.0%
+
+Single-language (Python-only) numbers badly understated this model. Running the
+same 2-attempt protocol across two languages on the **vLLM W4A16 + MTP,
+MAX_SEQS=1** stack (105 t/s):
+
+| Language | n | pass@1 | pass@2 |
+|---|---:|---:|---:|
+| JavaScript | 40 | 57.5% | **90.0%** |
+| Python | 34 | 32.4% | 52.9% |
+| **Overall** | **74** | 45.9% | **73.0%** |
+
+**This clears ">100 t/s at >64%": 105 t/s and 73.0% pass@2 simultaneously.**
+
+Python is by far the harder half of this set for Qwen 3.8 — JS is +37 pts. Any
+Python-only figure (our earlier 50.0% / 52.9%) is not representative. The n=74
+sample also tightens the estimate a lot versus the n=34 runs, whose 95% CI spanned
+~24 points.
+
+Harness: `bench/aider_multi.py` (python/javascript/java). JS needed a babel fix —
+presets cannot resolve through a symlinked `node_modules`, so the runner rewrites
+`babel.config.js` with `require.resolve`. **Before that fix JS scored a false 0%**,
+which would have inverted this conclusion.
