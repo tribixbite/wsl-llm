@@ -108,3 +108,8 @@ Write-Host ""
 # back to 'Continue' and fold stderr into stdout so it just lands in the log.
 $ErrorActionPreference = 'Continue'
 & $exe @srvArgs 2>&1
+
+# Propagate llama-server's exit code. Without this the wrapper always returns 0,
+# so a failed start looks like success to Task Scheduler and its restart-on-
+# failure never fires — the endpoint would just be silently missing.
+exit $LASTEXITCODE
