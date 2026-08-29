@@ -627,8 +627,53 @@ by eyeballing plausible-looking prose:
 **Vision costs prefill, not decode** — 38.6 t/s with an image is the same as the 38.4 t/s
 text-only median. The image is encoded once into ~250 tokens and then decoding proceeds normally.
 
-### ⚠️ Vision and MTP are mutually exclusive on 16 GB
-weights 12.24 + mmproj 0.86 + KV ≈ 14.0 GiB at 16k. Adding the 1.28 GiB MTP draft head on top
-lands at ~15.2 GiB, inside the WDDM eviction band that cost us a ~700× collapse (§3a). **Pick
-one:** MTP for ~75 t/s text-only, or vision at ~38 t/s. Dropping to `-c 8192` or `q4_0` KV does
-not buy back enough to fit both safely.
+### Vision AND MTP together — `--no-mmproj-offload` (correction)
+An earlier revision of this document concluded these were mutually exclusive, because
+12.24 + 0.86 + 1.28 + KV lands at ~15.2 GiB, inside the eviction band. **That was wrong** — it
+assumed the projector must live in VRAM. `--no-mmproj-offload` keeps it on the CPU, and the
+projector runs once per image rather than per token, so the trade is excellent. See §18.
+
+
+---
+
+## 18. Both at once, on native Windows: 87 t/s *and* vision
+
+`--no-mmproj-offload` keeps the 0.86 GiB vision projector on the CPU, which is what lets the
+MTP draft head and vision coexist on a 16 GB card. Measured on **native Windows**
+(llama.cpp b10659, `-c 16384 -ctk q8_0 -ctv q8_0 --parallel 1`, 175 W):
+
+| | value |
+|---|---:|
+| peak VRAM | **14,472 MiB** (≈1.8 GiB slack) |
+| **text decode (code prompt, MTP)** | **87.3 t/s** |
+| **decode with an image in context** | **48.1 t/s** |
+| first encode of a given image (CPU projector) | ~3.1 s |
+| **repeat queries on the same image** | **~0.19 s** — llama.cpp caches the encoded image |
+| vision correctness | both ground-truth probes **PASS** (6/6 and 5/5) |
+
+So the CPU projector costs a one-off ~3 s per *new* image and nothing thereafter, in exchange
+for keeping the 1.89× speculative-decoding win. That is a far better trade than dropping either
+feature.
+
+**Native Windows slightly beats WSL2 here** (87.3 vs 85.0 t/s on the code prompt), consistent
+with the ±2% wash measured in §5 — the meaningful difference is not throughput but that Windows
+exposes NVIDIA's "Prefer No Sysmem Fallback" control, which WSL2 ignores (§3a). On a card this
+close to its ceiling, having allocations fail loudly instead of silently degrading is worth more
+than the 2%.
+
+### Launchers
+
+| platform | script |
+|---|---|
+| Windows | `windows/start-qwen38.ps1` |
+| WSL2 / Linux | `scripts/serve-qwen38.sh` |
+
+Both take `-Mode`/`--mode` of `both` (default, MTP+vision), `fast` (MTP only, 32k ctx) or
+`vision` (vision only), plus port/context overrides, and both warn if the GPU is not at 175 W.
+
+```powershell
+.\start-qwen38.ps1                 # MTP + vision on :8080
+```
+```bash
+./scripts/serve-qwen38.sh --mode fast --ctx 32768
+```
