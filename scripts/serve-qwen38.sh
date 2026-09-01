@@ -35,6 +35,7 @@ MMPROJ="${MMPROJ:-$MODEL_DIR/mmproj-F16.gguf}"
 MODE=both
 PORT=8080
 BIND=127.0.0.1
+KV=q8_0
 ALIAS=qwen3.8-27b
 APIKEY=
 CTX=0
@@ -45,6 +46,7 @@ while [[ $# -gt 0 ]]; do
     --mode)        MODE="$2"; shift 2 ;;
     --port)        PORT="$2"; shift 2 ;;
     --bind)        BIND="$2"; shift 2 ;;
+    --kv)          KV="$2"; shift 2 ;;
     --alias)       ALIAS="$2"; shift 2 ;;
     --api-key)     APIKEY="$2"; shift 2 ;;
     --ctx)         CTX="$2";  shift 2 ;;
@@ -56,9 +58,19 @@ done
 
 [[ -x "$LLAMA_BIN" ]] || { echo "missing llama-server: $LLAMA_BIN" >&2; exit 1; }
 [[ -f "$MODEL" ]]     || { echo "missing model: $MODEL" >&2; exit 1; }
-[[ $CTX -ne 0 ]] || { [[ "$MODE" == fast ]] && CTX=32768 || CTX=16384; }
+# Measured ceilings (16,303 MiB total, keep >=1 GiB slack):
+#   both  32k q4_0=14806  48k=15254  64k=15645(tight)
+#   long 128k q4_0=15731 (no MTP)  96k=15565  64k=14829
+if [[ $CTX -eq 0 ]]; then
+  case "$MODE" in fast) CTX=32768 ;; long) CTX=131072 ;; *) CTX=32768 ;; esac
+fi
+# >32k only fits with q4_0 KV. q4_0 on K is the quality-sensitive half
+# (llama.cpp#21591); prefer q8_0 K wherever it fits.
+# MTP + vision dominate the budget; past 16k the KV must be q4_0. Measured:
+# both@32k q8_0 = 15,291 MiB, decode 88.6 -> 65.4 t/s; q4_0 = 14,806 and full speed.
+[[ "$KV" == q8_0 && $CTX -gt 16384 ]] && KV=q4_0
 
-ARGS=(-m "$MODEL" -ngl 99 -fa on -c "$CTX" -ctk q8_0 -ctv q8_0
+ARGS=(-m "$MODEL" -ngl 99 -fa on -c "$CTX" -ctk "$KV" -ctv "$KV"
       --parallel 1 --host "$BIND" --port "$PORT"
       --alias "$ALIAS"          # else clients see the full .gguf path as the model id
       --jinja)
@@ -67,11 +79,11 @@ ARGS=(-m "$MODEL" -ngl 99 -fa on -c "$CTX" -ctk q8_0 -ctv q8_0
 case "$MODE" in
   both|fast) [[ -f "$MTP" ]] || { echo "missing MTP head: $MTP" >&2; exit 1; }
              ARGS+=(--spec-type draft-mtp -md "$MTP") ;;&
-  both|vision) [[ -f "$MMPROJ" ]] || { echo "missing projector: $MMPROJ" >&2; exit 1; }
+  both|vision|long) [[ -f "$MMPROJ" ]] || { echo "missing projector: $MMPROJ" >&2; exit 1; }
              ARGS+=(--mmproj "$MMPROJ") ;;&
   both)      ARGS+=(--no-mmproj-offload) ;;
-  fast|vision) ;;
-  *) echo "--mode must be both|fast|vision" >&2; exit 2 ;;
+  fast|vision|long) ;;
+  *) echo "--mode must be both|fast|vision|long" >&2; exit 2 ;;
 esac
 
 if [[ $THINKING -eq 1 ]]; then ARGS+=(--reasoning-effort medium)
@@ -81,6 +93,7 @@ case "$MODE" in
   both)   EXPECT="MTP + vision  (~87 t/s code, ~48 t/s with an image, images supported)" ;;
   fast)   EXPECT="MTP only      (~75-87 t/s, no images)" ;;
   vision) EXPECT="vision only   (~38 t/s, images supported)" ;;
+  long)   EXPECT="long context  (128k, ~24-38 t/s, vision, no MTP)" ;;
 esac
 
 echo

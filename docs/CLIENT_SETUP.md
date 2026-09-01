@@ -36,11 +36,45 @@ which several UIs mangle. The launchers set `--alias qwen3.8-27b` for this reaso
 
 ## 2. Context window and token limits
 
+**128k context is achievable and usable** — measured, not extrapolated. The trade is speculative
+decoding: the MTP draft head costs 1.83 GiB, which is worth about 80k tokens of q4_0 KV.
+
+### With MTP + vision (`--mode both`), q4_0 KV
+
+| ctx | peak VRAM | slack | verdict |
+|---:|---:|---:|---|
+| 32k | 14,806 MiB | 1.5 GiB | ⭐ default — comfortable |
+| 48k | 15,254 MiB | 1.0 GiB | fine |
+| 64k | 15,645 MiB | 0.66 GiB | works, but near the eviction cliff |
+
+### Without MTP (`--mode long` / `vision`), q4_0 KV
+
+| ctx | peak VRAM | slack |
+|---:|---:|---:|
+| 64k | 14,829 MiB | 1.4 GiB |
+| 96k | 15,565 MiB | 0.7 GiB |
+| **128k** | **15,731 MiB** | 0.56 GiB |
+
+### Decode actually holds up at depth
+
+Measured on a 128k server by filling the context, not just allocating it:
+
+| depth | 20k | 41k | 61k | 85k | 100k | 115k |
+|---|---:|---:|---:|---:|---:|---:|
+| decode t/s | 38.8 | 34.6 | 31.0 | 27.2 | 25.6 | **24.3** |
+
+Output stayed coherent throughout. **llama.cpp#27623's reported ~25× collapse past 80k did not
+reproduce here**, nor did #27756's instant-EOS — decode just declines ~30% from peak to 115k.
+
 | | value |
 |---|---|
-| **Server context (`n_ctx`)** | **16384** in `both`/`vision` mode · **32768** in `fast` mode |
-| Max measured on this GPU | 64k (q4_0 KV, 13,536 MiB) |
-| Model's architectural max | 262,144 (not reachable in 16 GB) |
+| Model's architectural max | 262,144 (YaRN to 1M; not reachable in 16 GB) |
+| KV cost | ~39 KiB/token at q8_0, ~22.5 KiB/token at q4_0 |
+
+⚠️ Past 16k the KV must be **q4_0**, and q4_0 on **K** is the quality-sensitive half
+(llama.cpp#21591 — q4_0 on K alone can reproduce a quality collapse, while V-only costs ~1/500).
+The launchers switch automatically, but this repo has **not** quality-tested q4_0 K on this model.
+If you need long context *and* maximum fidelity, that is the thing to verify first.
 
 **`n_ctx` is fixed when the server loads.** A client-side "context length" box does not change
 it — if the UI sends more than 16k the server truncates or errors. Set the UI's context to match
@@ -50,11 +84,14 @@ the server, never above.
 
 It shares the window with your prompt: `prompt + max_tokens ≤ n_ctx`.
 
-| mode | suggested `max_tokens` | why |
-|---|---:|---|
-| non-thinking | **4096** | measured median generation 620 tokens |
-| thinking, `reasoning_effort=medium` | **8192** | median ~1100, but long traces reach 10k+ |
-| thinking, `xhigh` | 16384+ | ~220 s/exercise — impractical, avoid |
+| server ctx | practical `max_tokens` | notes |
+|---:|---:|---|
+| 32k (`both`, default) | **8192**–16384 | median generation is 620 non-thinking / ~1100 thinking |
+| 48k–64k | 16384 | |
+| 128k (`long`) | **32768+** | plenty of room; the limit becomes patience, not memory |
+
+Thinking traces can reach 10k+ tokens on hard problems, so do not set `max_tokens` below ~8192
+when thinking is on — truncating mid-reasoning returns an empty or broken answer.
 
 Thinking tokens count against `max_tokens`. Setting it too low truncates mid-reasoning and you
 get an empty or broken answer — a common cause of "the model returned nothing".

@@ -31,11 +31,13 @@
 
 [CmdletBinding()]
 param(
-    [ValidateSet('both', 'fast', 'vision')]
+    [ValidateSet('both', 'fast', 'vision', 'long')]
     [string]$Mode = 'both',
     [int]$Port = 8080,
     # NOT -Host: $Host is a PowerShell automatic variable and cannot be a param.
     [string]$Bind = '127.0.0.1',
+    [ValidateSet('f16','q8_0','q5_1','q4_0')]
+    [string]$KvType = 'q8_0',
     [string]$Alias = 'qwen3.8-27b',
     [string]$ApiKey = '',
     [int]$Ctx = 0,                       # 0 = pick a safe default for the mode
@@ -54,14 +56,26 @@ foreach ($f in @($exe, $model)) {
     if (-not (Test-Path $f)) { throw "missing: $f" }
 }
 
-if ($Ctx -eq 0) { $Ctx = if ($Mode -eq 'fast') { 32768 } else { 16384 } }
+# Measured VRAM ceilings (16,303 MiB total; keep >=1 GiB slack — past ~15.6 GiB
+# the driver starts evicting and decode degrades):
+#   both  32k q4_0 = 14,806   48k = 15,254   64k = 15,645 (only 658 MiB slack)
+#   long 128k q4_0 = 15,731 (no MTP)   96k = 15,565   64k = 14,829
+if ($Ctx -eq 0) {
+    $Ctx = switch ($Mode) { 'fast' { 32768 } 'long' { 131072 } default { 32768 } }
+}
+# Above ~64k the KV cache only fits as q4_0. Note q4_0 on K is the quality-
+# sensitive half (llama.cpp#21591); q8_0 K is preferred wherever it fits.
+# MTP (1.83 GiB) + vision already dominate the budget, so anything past 16k
+# needs q4_0 KV. Measured: both@32k q8_0 = 15,291 MiB and decode fell 88.6 ->
+# 65.4 t/s from VRAM pressure; the same 32k at q4_0 is 14,806 MiB and full speed.
+if ($KvType -eq 'q8_0' -and $Ctx -gt 16384) { $KvType = 'q4_0' }
 
 $srvArgs = @(
     '-m', $model,
     '-ngl', '99',
     '-fa', 'on',
     '-c', "$Ctx",
-    '-ctk', 'q8_0', '-ctv', 'q8_0',
+    '-ctk', $KvType, '-ctv', $KvType,
     '--parallel', '1',                   # see header — do not raise this
     '--host', $Bind,
     '--port', "$Port",
@@ -74,7 +88,7 @@ if ($Mode -in @('both', 'fast')) {
     if (-not (Test-Path $mtp)) { throw "missing MTP draft head: $mtp" }
     $srvArgs += @('--spec-type', 'draft-mtp', '-md', $mtp)
 }
-if ($Mode -in @('both', 'vision')) {
+if ($Mode -in @('both', 'vision', 'long')) {
     if (-not (Test-Path $mmproj)) { throw "missing vision projector: $mmproj" }
     $srvArgs += @('--mmproj', $mmproj)
     # Only keep the projector off the GPU when we also need room for MTP.
@@ -96,6 +110,7 @@ $expect = switch ($Mode) {
     'both'   { 'MTP + vision  (~75 t/s text, images supported)' }
     'fast'   { 'MTP only      (~75 t/s, no images)' }
     'vision' { 'vision only   (~38 t/s, images supported)' }
+    'long'   { 'long context  (128k, ~24-38 t/s, vision, no MTP)' }
 }
 
 Write-Host ""
