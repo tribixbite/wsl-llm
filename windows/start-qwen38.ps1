@@ -100,8 +100,19 @@ if ($Mode -in @('both', 'vision', 'long')) {
     # Only keep the projector off the GPU when we also need room for MTP.
     if ($Mode -eq 'both') { $srvArgs += '--no-mmproj-offload' }
 }
-if ($NoThinking) { $srvArgs += @('--reasoning-budget', '0') }
-else             { $srvArgs += @('--reasoning-effort', 'medium') }
+# Unsloth's published sampling, applied server-side so a client that sends no
+# params still gets the right values. llama.cpp inherits temp/top_p/top_k from
+# the GGUF metadata, but its min_p default is 0.05 whereas Unsloth specifies 0.0
+# for BOTH modes — that is the one value we must set explicitly.
+if ($NoThinking) {
+    $srvArgs += @('--reasoning-budget', '0',
+                  '--temp', '0.7', '--top-p', '0.80', '--top-k', '20',
+                  '--min-p', '0.0', '--presence-penalty', '1.5')
+} else {
+    $srvArgs += @('--reasoning-effort', 'medium',
+                  '--temp', '1.0', '--top-p', '0.95', '--top-k', '20',
+                  '--min-p', '0.0', '--presence-penalty', '0.0')
+}
 
 # Autostart can fire more than once (logon + manual run). A second llama-server
 # would try to allocate another ~14 GB and take the whole GPU down with it, so

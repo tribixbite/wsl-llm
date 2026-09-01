@@ -86,8 +86,17 @@ case "$MODE" in
   *) echo "--mode must be both|fast|vision|long" >&2; exit 2 ;;
 esac
 
-if [[ $THINKING -eq 1 ]]; then ARGS+=(--reasoning-effort medium)
-else                           ARGS+=(--reasoning-budget 0); fi
+# Unsloth's published sampling, applied server-side so a client sending no
+# params still gets the right values. llama.cpp inherits temp/top_p/top_k from
+# the GGUF metadata but defaults min_p to 0.05; Unsloth specifies 0.0 for BOTH
+# modes, so that one must be set explicitly.
+if [[ $THINKING -eq 1 ]]; then
+  ARGS+=(--reasoning-effort medium
+         --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0.0 --presence-penalty 0.0)
+else
+  ARGS+=(--reasoning-budget 0
+         --temp 0.7 --top-p 0.80 --top-k 20 --min-p 0.0 --presence-penalty 1.5)
+fi
 
 case "$MODE" in
   both)   EXPECT="MTP + vision  (~87 t/s code, ~48 t/s with an image, images supported)" ;;

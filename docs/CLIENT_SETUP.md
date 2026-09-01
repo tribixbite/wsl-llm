@@ -96,7 +96,23 @@ when thinking is on — truncating mid-reasoning returns an empty or broken answ
 
 ---
 
-## 3. Sampling — use Qwen's official values
+## 3. Sampling — now applied server-side
+
+The launchers pass Unsloth's published values explicitly, so a client that sends **no** sampling
+params still gets the right ones. Verified live via `/props`:
+
+```
+temperature 1.0   top_p 0.95   top_k 20   min_p 0.0   presence_penalty 0.0   repeat_penalty 1.0
+```
+
+llama.cpp inherits temp/top_p/top_k from the GGUF metadata (Unsloth baked them in), **but its
+`min_p` default is 0.05 while Unsloth specifies 0.0 for both modes** — that was the one
+deviation and it is now set explicitly.
+
+⚠️ **The benchmark scores in `QWEN38_27B_LEGION_BENCHMARKS.md` were measured with `min_p 0.05`**
+(the old default), not the compliant 0.0. Whether that helps or hurts is unmeasured.
+
+## 3b. Qwen's official values, for reference
 
 Two distinct presets. Using the thinking preset in non-thinking mode (or vice versa) measurably
 degrades output.
