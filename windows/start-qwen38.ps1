@@ -38,6 +38,11 @@ param(
     [string]$Bind = '127.0.0.1',
     [ValidateSet('f16','q8_0','q5_1','q4_0')]
     [string]$KvType = 'q8_0',
+    # Exposed but leave at f16: quantizing the draft KV buys nothing. MTP's
+    # 1.83 GiB is the draft WEIGHTS, not its cache (one nextn layer). Measured
+    # at 64k: q4_0 draft KV = 15,695 MiB vs 15,645 default — no saving.
+    [ValidateSet('f16','q8_0','q5_1','q4_0')]
+    [string]$DraftKv = 'f16',
     [string]$Alias = 'qwen3.8-27b',
     [string]$ApiKey = '',
     [int]$Ctx = 0,                       # 0 = pick a safe default for the mode
@@ -61,7 +66,7 @@ foreach ($f in @($exe, $model)) {
 #   both  32k q4_0 = 14,806   48k = 15,254   64k = 15,645 (only 658 MiB slack)
 #   long 128k q4_0 = 15,731 (no MTP)   96k = 15,565   64k = 14,829
 if ($Ctx -eq 0) {
-    $Ctx = switch ($Mode) { 'fast' { 32768 } 'long' { 131072 } default { 32768 } }
+    $Ctx = switch ($Mode) { 'fast' { 49152 } 'long' { 131072 } default { 49152 } }
 }
 # Above ~64k the KV cache only fits as q4_0. Note q4_0 on K is the quality-
 # sensitive half (llama.cpp#21591); q8_0 K is preferred wherever it fits.
@@ -86,7 +91,8 @@ if ($ApiKey) { $srvArgs += @('--api-key', $ApiKey) }
 
 if ($Mode -in @('both', 'fast')) {
     if (-not (Test-Path $mtp)) { throw "missing MTP draft head: $mtp" }
-    $srvArgs += @('--spec-type', 'draft-mtp', '-md', $mtp)
+    $srvArgs += @('--spec-type', 'draft-mtp', '-md', $mtp,
+                  '-ctkd', $DraftKv, '-ctvd', $DraftKv)
 }
 if ($Mode -in @('both', 'vision', 'long')) {
     if (-not (Test-Path $mmproj)) { throw "missing vision projector: $mmproj" }

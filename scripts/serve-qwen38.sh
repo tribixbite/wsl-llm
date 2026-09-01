@@ -62,7 +62,7 @@ done
 #   both  32k q4_0=14806  48k=15254  64k=15645(tight)
 #   long 128k q4_0=15731 (no MTP)  96k=15565  64k=14829
 if [[ $CTX -eq 0 ]]; then
-  case "$MODE" in fast) CTX=32768 ;; long) CTX=131072 ;; *) CTX=32768 ;; esac
+  case "$MODE" in fast) CTX=49152 ;; long) CTX=131072 ;; *) CTX=49152 ;; esac
 fi
 # >32k only fits with q4_0 KV. q4_0 on K is the quality-sensitive half
 # (llama.cpp#21591); prefer q8_0 K wherever it fits.

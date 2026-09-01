@@ -43,8 +43,8 @@ decoding: the MTP draft head costs 1.83 GiB, which is worth about 80k tokens of 
 
 | ctx | peak VRAM | slack | verdict |
 |---:|---:|---:|---|
-| 32k | 14,806 MiB | 1.5 GiB | ⭐ default — comfortable |
-| 48k | 15,254 MiB | 1.0 GiB | fine |
+| 32k | 14,806 MiB | 1.5 GiB | most conservative |
+| **48k** | **15,254 MiB** | **1.0 GiB** | ⭐ default |
 | 64k | 15,645 MiB | 0.66 GiB | works, but near the eviction cliff |
 
 ### Without MTP (`--mode long` / `vision`), q4_0 KV
@@ -233,3 +233,33 @@ AnythingLLM's context-window field is used for *its own* prompt budgeting — se
 
 For embeddings use a separate model; this server exposes a chat model only, and pointing an
 embedder at it will fail or waste the single slot.
+
+
+---
+
+## 10. ⚠️ The GPU is currently power-limited to ~99 W, costing ~30% throughput
+
+Paired measurement, **identical config** (`both`, 16k, q8_0 KV), same prompt and sampling:
+
+| | 2026-08-29 | 2026-09-01 |
+|---|---:|---:|
+| decode | **87–88 t/s** | **58–67 t/s** |
+| SM clock under load | 2482 MHz | **1357 MHz** |
+| power draw | 159.9 W | **~99 W** |
+| `clocks_event_reasons.active` | 0x0 | **0x4 (SW Power Cap)** |
+
+Ruled out by test: config, context size, KV dtype, sampling preset, Discord/AnythingLLM (the
+desktop costs only 82 MiB of VRAM), and thermals (53–61 °C).
+
+`nvidia-smi` still reports `Current Power Limit: 175 W`, so this is **not** a Lenovo mode
+revert in the way that reads — enforcement is happening at ~99 W anyway.
+
+**Prime suspect: the crash-mitigation stack applied 2026-08-28**
+(`C:\llm\HANDOFF-machine-and-autostart.md` §2) — specifically **Intel DTT being disabled**.
+DTT arbitrates Dynamic Boost, which is how this chassis reaches 175 W (150 W cTGP + 25 W boost).
+With DTT off the GPU cannot claim its share.
+
+**This is a real trade, not a bug to fix blindly:** those mitigations took the machine from
+6 crashes in 24 h to ~4 days clean. Restoring full GPU power may restore the bugchecks. Deciding
+between "stable at ~65 t/s" and "fast at ~88 t/s but crashy" is a judgement call — test by
+re-enabling the `dptftcs` service and watching both throughput *and* `C:\Windows\Minidump`.
