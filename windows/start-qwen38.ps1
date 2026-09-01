@@ -34,6 +34,10 @@ param(
     [ValidateSet('both', 'fast', 'vision')]
     [string]$Mode = 'both',
     [int]$Port = 8080,
+    # NOT -Host: $Host is a PowerShell automatic variable and cannot be a param.
+    [string]$Bind = '127.0.0.1',
+    [string]$Alias = 'qwen3.8-27b',
+    [string]$ApiKey = '',
     [int]$Ctx = 0,                       # 0 = pick a safe default for the mode
     [string]$Root = 'C:\llm',
     [switch]$NoThinking
@@ -59,10 +63,12 @@ $srvArgs = @(
     '-c', "$Ctx",
     '-ctk', 'q8_0', '-ctv', 'q8_0',
     '--parallel', '1',                   # see header — do not raise this
-    '--host', '127.0.0.1',
+    '--host', $Bind,
     '--port', "$Port",
+    '--alias', $Alias,          # else clients see the full .gguf path as the model id
     '--jinja'
 )
+if ($ApiKey) { $srvArgs += @('--api-key', $ApiKey) }
 
 if ($Mode -in @('both', 'fast')) {
     if (-not (Test-Path $mtp)) { throw "missing MTP draft head: $mtp" }
@@ -94,7 +100,11 @@ $expect = switch ($Mode) {
 
 Write-Host ""
 Write-Host "  Qwen3.8-27B  ->  $expect"
-Write-Host "  context $Ctx | OpenAI endpoint: http://127.0.0.1:$Port/v1"
+Write-Host "  context $Ctx | OpenAI endpoint: http://${Bind}:$Port/v1"
+Write-Host "  model id  : $Alias   |  auth: $(if ($ApiKey) {'api key set'} else {'none (any dummy key works)'})"
+if ($Bind -eq '127.0.0.1') {
+    Write-Host "  note: bound to localhost. For Docker/LAN clients use -Bind 0.0.0.0"
+}
 Write-Host ""
 & nvidia-smi --query-gpu=name,enforced.power.limit,memory.used --format=csv,noheader
 Write-Host "  (starts at any power limit. 175 W via Fn+Q is worth +32% decode /"

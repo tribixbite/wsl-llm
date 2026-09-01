@@ -44,11 +44,13 @@ nvidia-smi --query-gpu=name,compute_cap --format=csv,noheader
   context. `--no-mmproj-offload` keeps the projector on CPU so **vision and MTP coexist**.
 - **Just use the launchers**: `windows/start-qwen38.ps1` (+ `install-autostart.ps1` for a logon
   task) or `scripts/serve-qwen38.sh`. Modes: `both` (default) | `fast` | `vision`.
-- ⚠️ **This machine bugchecks randomly** — `nt` and `clipsp.sys` access violations across
-  unrelated subsystems/processes, i.e. memory corruption, almost certainly the aftermarket
-  2x64 GB DDR5-5600 kit (marginal for Arrow Lake HX). NOT caused by the GPU workload; it
-  predates it. Always checkpoint long runs — `aider_lite` appends per-exercise JSONL and
-  resumes exactly. See `docs/QWEN38_27B_LEGION_BENCHMARKS.md` §10.
+- ⚠️ **This machine bugchecks randomly** — a **Windows kernel bug**, not your code, not RAM,
+  not the NVIDIA driver: a lock-free race in `nt!ExpPoolTrackerChargeEntry` (documented
+  cross-OEM issue on Core Ultra 9 275HX + Win11 25H2, unfixed). It surfaces in unrelated
+  subsystems because the crashing component is whoever allocates pool next. **Do not run
+  MemTest86** — an earlier note here wrongly blamed the RAM. Mitigations (core parking off,
+  C-states off on AC, Performance mode) are applied — **do not revert them**; see
+  `C:\llm\HANDOFF-machine-and-autostart.md`. Always checkpoint long runs.
 
 ---
 

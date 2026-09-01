@@ -367,54 +367,44 @@ Still not done:
   100% well-formed diff rate is adjacent evidence but not the same thing.
 - KLD used `--chunks 100` (11.8 GiB of logits); more chunks would tighten the tail percentiles.
 
-## 10. Machine stability — memory corruption, not a driver or the workload
+## 10. Machine stability — a Windows kernel pool-tracker bug (superseded diagnosis)
 
-This box bugchecked **five times** (twice before this work began). Symbol resolution via
-`kd.exe -z <dump> -c "!analyze -v"` on all five dumps:
+> **This section was rewritten 2026-09-01.** An earlier revision concluded the crashes were
+> memory corruption from the aftermarket 2×64 GB DDR5-5600 kit and recommended MemTest86.
+> **That conclusion was wrong.** A separate investigation (see `C:\llm\HANDOFF-machine-and-autostart.md`)
+> pinned it properly, and its evidence is much stronger than mine.
 
-| dump | bugcheck | module | process | failure bucket |
-|---|---|---|---|---|
-| 8/12 5:59 AM | 0x1E | `nt` | chrome.exe | `AV_R_nt!PpmEventAddAffinityMaskAsSubset` |
-| 8/27 4:58 PM | 0x1E | `nt` | svchost.exe | `AV_nt!ExpPoolTrackerChargeEntry` |
-| 8/27 7:40 PM | 0x1E | `nt` | Registry | `AV_R_nt!RtlRaiseStatus` |
-| 8/27 8:47 PM | 0x3B | `clipsp` | svchost.exe | `AV_clipsp!unknown_function` |
-| 8/27 9:50 PM | 0x3B | `clipsp` | svchost.exe | `AV_clipsp!unknown_function` |
+**Root cause: a lock-free race on the per-processor `_POOL_TRACKER_TABLE` in
+`nt!ExAllocateHeapPool`.** A CPU captures its per-processor tracker pointer, the table is
+migrated or freed underneath it, and the atomic add lands in freed memory.
 
-**Diagnosis: memory corruption.** Access violations scattered across unrelated kernel
-subsystems (power management, pool tracking, exception dispatch, licensing) hitting unrelated
-processes (chrome, svchost, Registry) is the signature of bad memory, not one buggy driver.
+```
+FAILURE_ID_HASH   : 6f13343d-8edf-14f9-0269-6df067c74f57
+FAILURE_BUCKET_ID : AV_nt!ExpPoolTrackerChargeEntry
+FAULTING IP       : nt!ExpPoolTrackerChargeEntry+0x40   (lock xadd qword ptr [r14+r8], rbp)
+BUGCHECKS         : 0x1E, 0x3B, 0x7E, 0xEF, 0x9F, 0xA — all 0xC0000005
+```
 
-**The hardware is the prime suspect.** This laptop carries an aftermarket **128 GB kit — two
-64 GB Crucial `CT64G56C46S5.M16B1` DDR5 SODIMMs at 5600 MT/s**, one per channel. Two
-*dual-rank* 64 GB modules at full 5600 is a marginal load for an Arrow Lake HX memory
-controller, which typically wants a derate to 5200 or 4800 at that population.
+This explains the very thing I misread as "scattered = bad RAM": the *crashing* component is
+whichever subsystem allocates pool next, so it surfaces in graphics, registry, NTFS and processor
+power management indiscriminately. Same signature, one cause.
 
-Corroborating: **no WHEA errors are logged** — consumer SODIMMs have no ECC, so corruption is
-silent and surfaces as random access violations rather than recorded hardware faults. Windows
-Memory Diagnostic has never been run on this machine.
+It is a **documented cross-OEM bug** — 40+ reports across Alienware, Dell, ASUS, MSI, Acer and
+Lenovo, common factor **Core Ultra 9 275HX (Arrow Lake-HX) + Windows 11 25H2**; Microsoft Q&A
+5921413, Dell KB 000492904. Under investigation by Microsoft and Intel, **no fix as of 2026-09-01**.
 
-**Ruled out by experiment.** Crashes continued after every one of these:
-- peak VRAM cut from 15.2 GiB to 13.4 GiB (WDDM eviction pressure)
-- CUDA graphs disabled (`GGML_CUDA_DISABLE_GRAPHS=1`)
-- thermal backoff plus a 20 s inter-exercise cooldown; GPU never exceeded 81 C
-- no WHEA/thermal-trip events at any point
+**Do not run MemTest86 on the strength of my earlier advice.** Multiple users with the *identical*
+failure hash tested clean; one dual-booted Windows 10 on the same hardware for a year with zero
+crashes. The NVIDIA driver, thermals (171 W / 77 °C, zero throttling) and WHEA are all ruled out
+too. Crashes cluster at **idle**, not under load — power-state transitions, not allocation volume.
 
-> **Correction.** An earlier revision of this document claimed three crashes faulted at the
-> same instruction because their addresses shared the low digits `96710`. Symbol resolution
-> disproves that: they are in different modules and different functions. The shared digits
-> were coincidence. The conclusion "one repeating driver bug" was wrong.
+**Mitigations currently applied** (core parking disabled, C-states off on AC, DTT disabled,
+Lenovo Performance mode): 6 crashes in 24 h → ~4 days clean. Encouraging but not yet proof; the
+pre-mitigation record includes an 8.7-day clean streak. **Do not revert that power configuration.**
 
-**Recommended, in order:** MemTest86 from USB (Windows' own diagnostic is too weak for
-marginal timing faults) → if it fails, derate memory to 5200/4800 in BIOS. `wsl --update`
-(this host is on **2.4.13**; 2.7.0 carries Blackwell CUDA-graph fixes) and an NVIDIA driver
-update are worthwhile hygiene but do **not** address this.
-
-**Why it did not cost us the results:** `aider_lite.py` appends one JSONL record per exercise,
-so a killed run resumes exactly where it died. The 34-exercise thinking run completed across
-three legs and merged exactly. Any long run on this machine should be checkpointed the same way.
-
-
----
+What stands from my original section: the benchmark harnesses checkpoint per exercise
+(`aider_lite` appends JSONL, aider's polyglot supports `--cont`), which is why a 34-exercise run
+survived three reboots and merged exactly. On this machine, checkpoint every long run.
 
 ## 11. Quantization damage: KL-divergence vs a Q8_0 reference
 

@@ -34,6 +34,9 @@ MMPROJ="${MMPROJ:-$MODEL_DIR/mmproj-F16.gguf}"
 
 MODE=both
 PORT=8080
+BIND=127.0.0.1
+ALIAS=qwen3.8-27b
+APIKEY=
 CTX=0
 THINKING=1
 
@@ -41,6 +44,9 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --mode)        MODE="$2"; shift 2 ;;
     --port)        PORT="$2"; shift 2 ;;
+    --bind)        BIND="$2"; shift 2 ;;
+    --alias)       ALIAS="$2"; shift 2 ;;
+    --api-key)     APIKEY="$2"; shift 2 ;;
     --ctx)         CTX="$2";  shift 2 ;;
     --no-thinking) THINKING=0; shift ;;
     -h|--help)     sed -n '2,30p' "$0"; exit 0 ;;
@@ -53,7 +59,10 @@ done
 [[ $CTX -ne 0 ]] || { [[ "$MODE" == fast ]] && CTX=32768 || CTX=16384; }
 
 ARGS=(-m "$MODEL" -ngl 99 -fa on -c "$CTX" -ctk q8_0 -ctv q8_0
-      --parallel 1 --host 127.0.0.1 --port "$PORT" --jinja)
+      --parallel 1 --host "$BIND" --port "$PORT"
+      --alias "$ALIAS"          # else clients see the full .gguf path as the model id
+      --jinja)
+[[ -n "$APIKEY" ]] && ARGS+=(--api-key "$APIKEY")
 
 case "$MODE" in
   both|fast) [[ -f "$MTP" ]] || { echo "missing MTP head: $MTP" >&2; exit 1; }
@@ -76,7 +85,9 @@ esac
 
 echo
 echo "  Qwen3.8-27B  ->  $EXPECT"
-echo "  context $CTX | OpenAI endpoint: http://127.0.0.1:$PORT/v1"
+echo "  context $CTX | OpenAI endpoint: http://${BIND}:$PORT/v1"
+echo "  model id  : $ALIAS  |  auth: ${APIKEY:+api key set}${APIKEY:-none (any dummy key works)}"
+[[ "$BIND" == "127.0.0.1" ]] && echo "  note: bound to localhost. For Docker/LAN clients use --bind 0.0.0.0"
 nvidia-smi --query-gpu=name,enforced.power.limit,memory.used --format=csv,noheader
 lim=$(nvidia-smi --query-gpu=enforced.power.limit --format=csv,noheader | tr -dc '0-9.' | cut -d. -f1)
 if [[ -n "$lim" && "$lim" -lt 150 ]]; then
