@@ -77,8 +77,9 @@ The launchers switch automatically, but this repo has **not** quality-tested q4_
 If you need long context *and* maximum fidelity, that is the thing to verify first.
 
 **`n_ctx` is fixed when the server loads.** A client-side "context length" box does not change
-it — if the UI sends more than 16k the server truncates or errors. Set the UI's context to match
-the server, never above.
+it — if the UI sends more than the server's `n_ctx` the request truncates or errors. Set the UI's
+context to match the server, never above. Check it with
+`curl -s localhost:8080/props | jq .default_generation_settings.n_ctx`.
 
 ### max_tokens (output budget)
 
@@ -92,9 +93,6 @@ It shares the window with your prompt: `prompt + max_tokens ≤ n_ctx`.
 
 Thinking traces can reach 10k+ tokens on hard problems, so do not set `max_tokens` below ~8192
 when thinking is on — truncating mid-reasoning returns an empty or broken answer.
-
-Thinking tokens count against `max_tokens`. Setting it too low truncates mid-reasoning and you
-get an empty or broken answer — a common cause of "the model returned nothing".
 
 ---
 
@@ -203,8 +201,18 @@ adjacent evidence, not the same thing.
 | with an image in context | ~48 |
 | prefill | ~1120–1350 |
 
-These assume the GPU is at **175 W** (Lenovo Performance mode). At the 95 W Balance cap expect
-roughly −32% decode and −42% prefill.
+These assume the GPU is at **175 W** (Lenovo Performance mode). At the ~95 W Balance cap expect
+roughly −32% decode and −42% prefill — measured 88 t/s vs 58–67 t/s on the identical config.
+
+⚠️ **Performance mode does not survive a reboot.** After a restart the EC drops back to ~95 W
+even though `nvidia-smi` still reports `Current Power Limit: 175 W`. The reliable tell is under
+load: `clocks_event_reasons.active = 0x4` (SW Power Cap) with the SM clock at ~1357 MHz instead
+of ~2482 MHz. Press **Fn+Q → Performance** after every boot, or you silently lose a third of your
+throughput.
+
+```bash
+nvidia-smi --query-gpu=clocks.sm,power.draw,clocks_event_reasons.active --format=csv -l 1
+```
 
 ---
 
