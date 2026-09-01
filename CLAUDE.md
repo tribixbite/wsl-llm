@@ -37,9 +37,13 @@ nvidia-smi --query-gpu=name,compute_cap --format=csv,noheader
   **llama.cpp + MTP is ~70% faster than ExLlamaV3** — no EXL3 MTP draft head exists.
 - ⚠️ `aider/benchmark/benchmark.py` calls `random.shuffle` **unseeded** before `--num-tests`,
   so every run tests a different random subset. Pin with `--keywords` before any A/B.
-- **Report pass@2, not pass@1** — `bench/aider_lite.py --tries 2` (now the default) matches the
-  aider leaderboard by feeding pytest output back for a second attempt. It is worth ~2.2x:
-  thinking 26.5% -> **58.8%**, non-thinking 17.6% -> **38.2%**.
+- **Report pass@2, not pass@1** — worth ~2.2x. Best scores: **66.7% pass@2** on the official
+  aider polyglot (diff format, py/js/java, 30 tests) and 63.3% (py/go/rust); the house
+  whole-file harness gives 58.8% thinking / 38.2% non-thinking.
+- **Best throughput: 88.6 t/s** (Windows, MTP, 16k ctx q8_0 KV), 48.1 t/s with an image in
+  context. `--no-mmproj-offload` keeps the projector on CPU so **vision and MTP coexist**.
+- **Just use the launchers**: `windows/start-qwen38.ps1` (+ `install-autostart.ps1` for a logon
+  task) or `scripts/serve-qwen38.sh`. Modes: `both` (default) | `fast` | `vision`.
 - ⚠️ **This machine bugchecks randomly** — `nt` and `clipsp.sys` access violations across
   unrelated subsystems/processes, i.e. memory corruption, almost certainly the aftermarket
   2x64 GB DDR5-5600 kit (marginal for Arrow Lake HX). NOT caused by the GPU workload; it

@@ -317,3 +317,20 @@ Key reversals from measurement:
 
 Final engine verdict: **llama.cpp + MTP**. ExLlamaV3 ties on quality and beats llama.cpp's
 baseline by 11%, but llama.cpp+MTP is ~70% faster than ExLlamaV3 and no EXL3 MTP head exists.
+
+
+## Best-of table (2026-09-01)
+
+| metric | best | config |
+|---|---:|---|
+| decode (code) | **88.6 t/s** | Windows, MTP, 16k q8_0 KV, 175 W |
+| decode w/ image in context | 48.1 t/s | + `--no-mmproj-offload` |
+| prefill | 1353 t/s | 175 W |
+| **pass@2 (official polyglot, diff)** | **66.7%** | py/js/java, 30 tests, thinking medium |
+| pass@2 (polyglot, diff) | 63.3% | py/go/rust, 30 tests |
+| pass@2 (house whole-file) | 58.8% | 34 python, thinking medium |
+| max context | 64k | q4_0 KV, 13,536 MiB |
+
+Serving is now one command: `windows/start-qwen38.ps1` / `scripts/serve-qwen38.sh`
+(modes both|fast|vision), plus `windows/install-autostart.ps1` for a hidden logon task that
+runs on battery and restarts on failure.

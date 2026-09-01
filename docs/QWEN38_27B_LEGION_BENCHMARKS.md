@@ -10,31 +10,48 @@
 
 ## 0. Headline results
 
+**Best measured: 88.6 t/s decode, 66.7% pass@2, with vision — all at once.**
+
 | Finding | Impact |
 |---|---|
+| **MTP speculative decoding** (the 1.28 GiB draft head Unsloth ships) | **1.89× overall, 2.14× on code** — 39.8 → **88.6 t/s** |
+| **Best agentic-coding score** — official aider polyglot, diff format (§15) | **66.7% pass@2** (py/js/java); 63.3% (py/go/rust) |
+| **`--no-mmproj-offload`** puts the vision projector on the CPU | **vision AND MTP coexist in 16 GB** (§18) |
 | **Fn+Q → Performance mode** raised the GPU from a ~90 W cap to 175 W | **+32% decode, +42% prefill** |
 | **`--parallel 1` is mandatory** — the default of 4 slots overshoots VRAM and WDDM silently evicts the model to system RAM | avoids a **~700× collapse** (39.8 → 0.04 t/s) |
-| **MTP speculative decoding** (the 1.28 GiB draft head Unsloth ships) | **1.89× overall, 2.14× on code** — 39.8 → 75.3 t/s |
+| **Thinking mode** is worth roughly 2× on coding | 58.8% vs 38.2% pass@2 on the house harness (§6) |
+| **pass@2 is ~2.2× pass@1** | do not report pass@1 for this model |
 | MTP costs **no measurable accuracy** (n=102/arm, p=0.59) | the speedup is effectively free |
-| **WSL2 ≈ native Windows** for fully-GPU-resident inference | within ±2% — no reason to migrate |
-| **Thinking mode** (`reasoning_effort=medium`) | **58.8% pass@2**, 26.5% pass@1 |
-| **pass@2 is ~2.2× pass@1 in both arms** | thinking 26.5%→**58.8%**, non-thinking 17.6%→**38.2%** |
+| **Current `UD-Q3_K_XL` beats revision `408fcc18`** on mean KLD, top-1 agreement and speed (§11) | the forum complaint is not supported |
+| ExLlamaV3 ties llama.cpp on quality (38.2% pass@2 both) but has no MTP head | **llama.cpp + MTP wins** (§13) |
+| **WSL2 ≈ native Windows** (±2%) | Windows wins only for its sysmem-fallback control |
 | Context is nearly free — only 16 of 64 layers hold a KV cache | 64k ctx costs ~2.5% decode |
 
-**Recommended daily driver:**
+### Scoreboard
 
-```bash
-~/llama.cpp/build/bin/llama-server \
-  -m ~/models/Qwen3.8-27B-GGUF/Qwen3.8-27B-UD-Q3_K_XL.gguf \
-  -ngl 99 -fa on -c 32768 -ctk q4_0 -ctv q4_0 --parallel 1 \
-  --spec-type draft-mtp -md ~/models/Qwen3.8-27B-GGUF/MTP/mtp-Qwen3.8-27B-Q4_0.gguf \
-  --jinja --reasoning-effort medium \
-  --host 127.0.0.1 --port 8080
+| metric | best | config |
+|---|---:|---|
+| decode, code prompt | **88.6 t/s** | Windows, MTP, 16k ctx q8_0 KV |
+| decode with an image in context | 48.1 t/s | same, `--no-mmproj-offload` |
+| prefill | 1353 t/s | 175 W |
+| **pass@2, official polyglot (diff)** | **66.7%** | 30 tests, py/js/java, thinking medium |
+| pass@2, house harness (whole-file) | 58.8% | 34 python, thinking medium |
+| diff-format well-formed rate | 100% / 96.7% | py/go/rust · py/js/java |
+| max context measured | 64k | q4_0 KV, 13,536 MiB |
+
+### Recommended: use the launchers
+
+```powershell
+.\windows\start-qwen38.ps1              # Windows — MTP + vision, :8080
+.\windows\install-autostart.ps1         # ...and start it at logon (§19)
 ```
-→ **~74 t/s, 14,704 MiB peak, 1.6 GiB headroom, 32k context, 58.8% pass@2.**
-Leave thinking ON: with thinking off, pass@2 falls 58.8% → 38.2%.
+```bash
+./scripts/serve-qwen38.sh                # WSL2/Linux — same defaults
+./scripts/serve-qwen38.sh --mode fast    # MTP only, 32k ctx
+```
 
----
+Defaults are MTP + vision at 16k ctx: **~88 t/s text, ~48 t/s with an image, 14,472 MiB
+(1.8 GiB slack)**. Leave thinking on — turning it off drops pass@2 from 58.8% to 38.2%.
 
 ## 1. Hardware
 
