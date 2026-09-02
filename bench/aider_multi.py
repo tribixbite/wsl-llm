@@ -63,13 +63,23 @@ def extract_code(text):
     blocks = re.findall(r"```[a-zA-Z]*\s*\n(.*?)```", text, re.DOTALL)
     return max(blocks, key=len).strip() if blocks else text.strip()
 
+SAMPLING = {"temperature": 1.0, "top_p": 0.95, "top_k": 20}   # Qwen3.8 thinking defaults
+EFFORT_STYLE = "kwargs"      # "kwargs" (vLLM/llama.cpp) | "top_level" (NInfer)
+
+
 def call(url, model, key, messages, max_tokens, timeout=900, effort=None, think=False):
     if isinstance(messages, str):
         messages = [{"role": "user", "content": messages}]
     body = {"model": model, "messages": messages, "max_tokens": max_tokens,
-            "temperature": 0.6, "top_p": 0.95, "top_k": 20}
+            **SAMPLING}
     if effort:
-        body["chat_template_kwargs"] = {"reasoning_effort": effort}
+        # Two conventions in the wild: vLLM/llama.cpp take it inside
+        # chat_template_kwargs; NInfer takes the OpenAI top-level field and
+        # 400s on the kwargs form. EFFORT_STYLE picks one.
+        if EFFORT_STYLE == "top_level":
+            body["reasoning_effort"] = effort
+        else:
+            body["chat_template_kwargs"] = {"reasoning_effort": effort}
     elif think:
         body["chat_template_kwargs"] = {"enable_thinking": True}
     req = urllib.request.Request(url.rstrip("/") + "/v1/chat/completions",
@@ -136,7 +146,16 @@ def main():
     ap.add_argument("--tries", type=int, default=2)
     ap.add_argument("--py", default=sys.executable)
     ap.add_argument("--out", default=None)
+    ap.add_argument("--temp", type=float, default=1.0,
+                    help="Qwen3.8 thinking default is 1.0 (temp 0 cripples this model)")
+    ap.add_argument("--top-p", type=float, default=0.95)
+    ap.add_argument("--top-k", type=int, default=20)
+    ap.add_argument("--effort-style", choices=["kwargs", "top_level"], default="kwargs",
+                    help="NInfer needs top_level; vLLM/llama.cpp need kwargs")
     args = ap.parse_args()
+    globals()["EFFORT_STYLE"] = args.effort_style
+    SAMPLING.update(temperature=args.temp, top_p=args.top_p, top_k=args.top_k)
+    print(f"sampling: {SAMPLING}", flush=True)
 
     rows = []
     t0 = time.time()
