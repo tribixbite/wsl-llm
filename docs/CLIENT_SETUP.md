@@ -279,3 +279,35 @@ With DTT off the GPU cannot claim its share.
 6 crashes in 24 h to ~4 days clean. Restoring full GPU power may restore the bugchecks. Deciding
 between "stable at ~65 t/s" and "fast at ~88 t/s but crashy" is a judgement call — test by
 re-enabling the `dptftcs` service and watching both throughput *and* `C:\Windows\Minidump`.
+
+
+---
+
+## 11. Watching the server without touching it
+
+`scripts/llm-stats.sh` — read-only. Sends **no inference**, so it never consumes the single slot
+and is safe to run mid-job.
+
+```bash
+./scripts/llm-stats.sh          # one-shot
+./scripts/llm-stats.sh -w       # refresh every 5s
+./scripts/llm-stats.sh -n 40    # last 40 completed requests
+```
+
+Reports: whether the slot is busy and with which task, the last N requests' prompt/generated
+token counts and prefill/decode t/s, plus VRAM, clocks, power and throttle reasons.
+
+Three underlying sources, all passive:
+
+| source | gives you | note |
+|---|---|---|
+| `GET /slots` | live: busy?, task id, prompt tokens, cache hits, speculative on/off | plain GET, no inference |
+| the server log | per-request prefill/decode t/s and token counts | **UTF-16LE** — pipe through `iconv -f UTF-16LE` or grep sees nothing |
+| `nvidia-smi` | VRAM, SM clock, power draw, `clocks_event_reasons` | `0x4` = SW power cap |
+
+⚠️ **Do not use a test completion to check health** — it occupies the only slot and queues behind
+whatever is running. Use `/health` or `/slots` instead.
+
+The log build here uses a progressive format (`print_timing … n_gen = N, tg = X t/s` plus
+`release: … stop processing`) rather than the classic `prompt eval time = …` triplet; the script
+parses both.
