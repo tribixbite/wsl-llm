@@ -28,10 +28,77 @@ from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 UPSTREAM = "http://127.0.0.1:8080"
+API_KEY = ""                       # injected upstream auth (vLLM etc.)
+BACKEND = None                     # "llama.cpp" | "vllm" | None (auto-detected once)
+SERVER_PARAMS = {}                 # shown on the dashboard (vLLM has no /props)
 REQUESTS = deque(maxlen=200)      # newest last
 IMAGES = {}                        # id -> (mime, bytes)
 LOCK = threading.Lock()
 DATA_URI = re.compile(r"^data:([^;]+);base64,(.*)$", re.S)
+
+
+def _auth_headers(extra=None):
+    """Headers for an upstream call: caller's auth if present, else our --api-key."""
+    h = dict(extra or {})
+    if API_KEY and not any(k.lower() == "authorization" for k in h):
+        h["Authorization"] = f"Bearer {API_KEY}"
+    return h
+
+
+def _get_json(path, timeout=4):
+    req = urllib.request.Request(f"{UPSTREAM}{path}", headers=_auth_headers())
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read())
+
+
+def _detect_backend():
+    """llama.cpp exposes /props; vLLM does not. Detect once, cache."""
+    global BACKEND
+    if BACKEND:
+        return BACKEND
+    try:
+        _get_json("/props", timeout=3)
+        BACKEND = "llama.cpp"
+        return BACKEND
+    except Exception:
+        pass
+    try:
+        _get_json("/v1/models", timeout=3)
+        BACKEND = "vllm"
+    except Exception:
+        BACKEND = None
+    return BACKEND
+
+
+def _vllm_metrics():
+    """Scrape the few Prometheus counters worth showing (incl. spec-decode)."""
+    out = {}
+    try:
+        req = urllib.request.Request(f"{UPSTREAM}/metrics", headers=_auth_headers())
+        with urllib.request.urlopen(req, timeout=4) as r:
+            body = r.read().decode("utf8", "replace")
+    except Exception:
+        return out
+    want = {
+        "vllm:num_requests_running": "running",
+        "vllm:num_requests_waiting": "waiting",
+        "vllm:gpu_cache_usage_perc": "kv_cache_used",
+        "vllm:spec_decode_num_accepted_tokens_total": "spec_accepted",
+        "vllm:spec_decode_num_draft_tokens_total": "spec_drafted",
+    }
+    for line in body.splitlines():
+        if line.startswith("#") or " " not in line:
+            continue
+        name, _, val = line.rpartition(" ")
+        base = name.split("{")[0]
+        if base in want:
+            try:
+                out[want[base]] = out.get(want[base], 0.0) + float(val)
+            except ValueError:
+                pass
+    if out.get("spec_drafted"):
+        out["spec_accept_rate"] = round(out["spec_accepted"] / out["spec_drafted"], 3)
+    return out
 
 
 def _harvest(messages):
@@ -101,33 +168,63 @@ class Handler(BaseHTTPRequestHandler):
         return self._proxy_get(path)
 
     def _state(self):
-        out = {"upstream": UPSTREAM, "ok": False}
-        try:
-            with urllib.request.urlopen(f"{UPSTREAM}/props", timeout=4) as r:
-                p = json.loads(r.read())
-            g = p.get("default_generation_settings", {})
-            out.update(ok=True, n_ctx=g.get("n_ctx"), slots=p.get("total_slots"),
-                       params={k: g.get("params", {}).get(k) for k in
-                               ("temperature", "top_p", "top_k", "min_p", "presence_penalty")})
-        except Exception as e:
-            out["error"] = str(e)
-        try:
-            with urllib.request.urlopen(f"{UPSTREAM}/slots", timeout=4) as r:
-                s = json.loads(r.read())
-            s = (s if isinstance(s, list) else [s])[0]
-            out["slot"] = {"busy": s.get("is_processing"), "task": s.get("id_task"),
-                           "prompt_tokens": s.get("n_prompt_tokens"),
-                           "processed": s.get("n_prompt_tokens_processed"),
-                           "speculative": s.get("speculative")}
-        except Exception:
+        be = _detect_backend()
+        out = {"upstream": UPSTREAM, "ok": False, "backend": be or "unknown"}
+
+        if be == "llama.cpp":
+            try:
+                p = _get_json("/props")
+                g = p.get("default_generation_settings", {})
+                out.update(ok=True, n_ctx=g.get("n_ctx"), slots=p.get("total_slots"),
+                           params={k: g.get("params", {}).get(k) for k in
+                                   ("temperature", "top_p", "top_k", "min_p",
+                                    "presence_penalty")})
+            except Exception as e:
+                out["error"] = str(e)
+            try:
+                s_ = _get_json("/slots")
+                s_ = (s_ if isinstance(s_, list) else [s_])[0]
+                out["slot"] = {"busy": s_.get("is_processing"), "task": s_.get("id_task"),
+                               "prompt_tokens": s_.get("n_prompt_tokens"),
+                               "processed": s_.get("n_prompt_tokens_processed"),
+                               "speculative": s_.get("speculative")}
+            except Exception:
+                out["slot"] = None
+
+        elif be == "vllm":
+            try:
+                m = _get_json("/v1/models")["data"][0]
+                out.update(ok=True, n_ctx=m.get("max_model_len"), model_id=m.get("id"))
+            except Exception as e:
+                out["error"] = str(e)
+            mx = _vllm_metrics()
+            out["metrics"] = mx
+            out["slots"] = None
+            if mx:
+                busy = (mx.get("running", 0) or 0) > 0
+                out["slot"] = {"busy": busy,
+                               "task": f"{int(mx.get('running',0))} running"
+                                       f" / {int(mx.get('waiting',0))} queued",
+                               "prompt_tokens": None, "processed": None,
+                               "speculative": mx.get("spec_accept_rate")}
+            else:
+                out["slot"] = None
+            # vLLM applies the model's generation_config.json as server defaults
+            out["params"] = SERVER_PARAMS
+        else:
+            out["error"] = "upstream not reachable"
             out["slot"] = None
+
         with LOCK:
             out["requests"] = list(REQUESTS)[-40:][::-1]
         return out
 
     def _proxy_get(self, path):
         try:
-            with urllib.request.urlopen(f"{UPSTREAM}{path}", timeout=30) as r:
+            hdrs = _auth_headers({k: v for k, v in self.headers.items()
+                                  if k.lower() in ("authorization",)})
+            req = urllib.request.Request(f"{UPSTREAM}{path}", headers=hdrs)
+            with urllib.request.urlopen(req, timeout=30) as r:
                 body = r.read()
                 ctype = r.headers.get("Content-Type", "application/json")
             return self._send(200, body, ctype)
@@ -152,10 +249,10 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             body = None
 
+        fwd = {k: v for k, v in self.headers.items()
+               if k.lower() not in ("host", "content-length", "accept-encoding")}
         req = urllib.request.Request(f"{UPSTREAM}{self.path}", data=raw,
-                                     headers={k: v for k, v in self.headers.items()
-                                              if k.lower() not in ("host", "content-length")},
-                                     method="POST")
+                                     headers=_auth_headers(fwd), method="POST")
         t0 = time.time()
         try:
             up = urllib.request.urlopen(req, timeout=3600)
@@ -191,10 +288,15 @@ class Handler(BaseHTTPRequestHandler):
                     except Exception:
                         continue
                     ch = o.get("choices") or []
-                    if ch and (ch[0].get("delta") or {}).get("content"):
-                        if ttft is None:
-                            ttft = time.time() - t0
-                        ntok += 1
+                    if ch:
+                        d_ = ch[0].get("delta") or {}
+                        # Qwen3.8 streams thinking in `reasoning`/`reasoning_content`;
+                        # counting only `content` badly undercounts decode t/s.
+                        if d_.get("content") or d_.get("reasoning") \
+                                or d_.get("reasoning_content"):
+                            if ttft is None:
+                                ttft = time.time() - t0
+                            ntok += 1
                     if o.get("usage"):
                         usage = o["usage"]
             except Exception:
@@ -213,9 +315,13 @@ class Handler(BaseHTTPRequestHandler):
         try:
             o = json.loads(data)
             rec["usage"] = o.get("usage")
-            ct = (o.get("usage") or {}).get("completion_tokens")
+            u_ = o.get("usage") or {}
+            ct = u_.get("completion_tokens")
             if ct:
                 rec["decode_tps"] = round(ct / max(wall, 1e-6), 1)
+            rt = (u_.get("completion_tokens_details") or {}).get("reasoning_tokens")
+            if rt:
+                rec["reasoning_tokens"] = rt
         except Exception:
             pass
         with LOCK:
@@ -259,6 +365,8 @@ td.l{text-align:left}
   <span id="up" class="pill">…</span>
   <span id="slot" class="pill">…</span>
   <span id="ctx" class="pill"></span>
+  <span id="be" class="pill"></span>
+  <span id="spec" class="pill"></span>
   <span style="margin-left:auto;color:var(--dim);font-size:12px">refresh 2s · read-only</span>
 </header>
 <main>
@@ -266,7 +374,7 @@ td.l{text-align:left}
   <div class="card"><h2>images seen in prompts</h2><div id="gallery" class="imgs"></div></div>
   <div class="card"><h2>recent requests</h2>
     <table><thead><tr><th>time</th><th>model</th><th>prompt tok</th><th>gen tok</th>
-      <th>decode t/s</th><th>ttft ms</th><th>img</th></tr></thead>
+      <th>reason tok</th><th>decode t/s</th><th>ttft ms</th><th>img</th></tr></thead>
       <tbody id="rows"></tbody></table>
     <div id="detail"></div>
   </div>
@@ -280,7 +388,12 @@ async function tick(){
   const s=d.slot;
   $('slot').textContent = s ? (s.busy?('BUSY task '+s.task):'idle') : 'slots n/a';
   $('slot').className = 'pill ' + (s && s.busy ? 'busy':'ok');
-  $('ctx').textContent = d.n_ctx ? ('n_ctx '+d.n_ctx.toLocaleString()+' · slots '+d.slots) : '';
+  $('ctx').textContent = d.n_ctx ? ('ctx '+d.n_ctx.toLocaleString()+(d.slots?(' · slots '+d.slots):'')) : '';
+  $('be').textContent = (d.backend||'') + (d.model_id?(' · '+d.model_id):'');
+  const mx = d.metrics||{};
+  $('spec').textContent = (mx.spec_accept_rate!=null)
+      ? ('spec accept '+(mx.spec_accept_rate*100).toFixed(1)+'%')
+      : (mx.kv_cache_used!=null ? ('kv '+(mx.kv_cache_used*100).toFixed(0)+'%') : '');
   const p=d.params||{};
   $('params').innerHTML = Object.keys(p).length
     ? Object.entries(p).map(([k,v])=>`${k} <b>${v}</b>`).join('')
@@ -297,11 +410,12 @@ async function tick(){
     const u=r.usage||{};
     return `<tr><td class="l">${r.t}</td><td class="l">${r.model||''}</td>
       <td>${(u.prompt_tokens||'')}</td><td>${(u.completion_tokens||'')}</td>
+      <td>${(u.completion_tokens_details&&u.completion_tokens_details.reasoning_tokens)||r.reasoning_tokens||''}</td>
       <td>${r.decode_tps??''}</td><td>${r.ttft_ms??''}</td>
       <td>${(r.images||[]).length||''}</td></tr>
-      ${r.text?`<tr><td colspan="7" class="l"><div class="txt">${
+      ${r.text?`<tr><td colspan="8" class="l"><div class="txt">${
         r.text.replace(/[<&]/g,c=>({'<':'&lt;','&':'&amp;'}[c]))}</div></td></tr>`:''}`;
-  }).join('') || '<tr><td colspan="7" class="none">no requests captured yet</td></tr>';
+  }).join('') || '<tr><td colspan="8" class="none">no requests captured yet</td></tr>';
 }
 tick(); setInterval(tick,2000);
 </script></body></html>"""
@@ -313,8 +427,19 @@ def main():
     ap.add_argument("--port", type=int, default=8090)
     ap.add_argument("--upstream", default="http://127.0.0.1:8080")
     ap.add_argument("--bind", default="0.0.0.0")
+    ap.add_argument("--api-key", default="",
+                    help="upstream API key, injected when the client sends none")
+    ap.add_argument("--params", default="",
+                    help='sampling defaults to display, e.g. "temperature=1.0,top_p=0.95"')
     args = ap.parse_args()
     UPSTREAM = args.upstream.rstrip("/")
+    global API_KEY, SERVER_PARAMS
+    API_KEY = args.api_key
+    if args.params:
+        for kv in args.params.split(","):
+            if "=" in kv:
+                k, v = kv.split("=", 1)
+                SERVER_PARAMS[k.strip()] = v.strip()
     print(f"monitor  http://{args.bind}:{args.port}/   ->  upstream {UPSTREAM}", flush=True)
     print(f"point clients at http://<host>:{args.port}/v1 to capture their traffic", flush=True)
     ThreadingHTTPServer((args.bind, args.port), Handler).serve_forever()
