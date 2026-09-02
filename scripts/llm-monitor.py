@@ -20,6 +20,7 @@ streaming, so behaviour is unchanged for the client.
 import argparse
 import base64
 import json
+import os
 import re
 import threading
 import time
@@ -31,10 +32,85 @@ UPSTREAM = "http://127.0.0.1:8080"
 API_KEY = ""                       # injected upstream auth (vLLM etc.)
 BACKEND = None                     # "llama.cpp" | "vllm" | None (auto-detected once)
 SERVER_PARAMS = {}                 # shown on the dashboard (vLLM has no /props)
-REQUESTS = deque(maxlen=200)      # newest last
+REQUESTS = deque(maxlen=500)      # newest last
+STORE = os.path.expanduser("~/.local/share/llm-monitor/requests.jsonl")
+STORE_MAX_BYTES = 64 * 1024 * 1024   # rotate past this
+IMG_DIR = os.path.expanduser("~/.local/share/llm-monitor/images")
+IMG_KEEP = 300                       # most-recent images kept on disk
+MIME_EXT = {"image/png": "png", "image/jpeg": "jpg", "image/jpg": "jpg",
+            "image/webp": "webp", "image/gif": "gif"}
 IMAGES = {}                        # id -> (mime, bytes)
 LOCK = threading.Lock()
 DATA_URI = re.compile(r"^data:([^;]+);base64,(.*)$", re.S)
+
+
+def _img_save(key, mime, raw):
+    """Write the image so the gallery survives a restart; prune oldest."""
+    try:
+        os.makedirs(IMG_DIR, exist_ok=True)
+        ext = MIME_EXT.get(mime, "bin")
+        with open(os.path.join(IMG_DIR, f"{key}.{ext}"), "wb") as f:
+            f.write(raw)
+        files = sorted(os.listdir(IMG_DIR))
+        for old in files[:-IMG_KEEP]:
+            try:
+                os.remove(os.path.join(IMG_DIR, old))
+            except OSError:
+                pass
+    except Exception:
+        pass
+
+
+def _img_load(key):
+    """Serve an image from memory, else from disk (post-restart)."""
+    with LOCK:
+        item = IMAGES.get(key)
+    if item:
+        return item
+    try:
+        for fn in os.listdir(IMG_DIR):
+            if fn.rsplit(".", 1)[0] == key:
+                ext = fn.rsplit(".", 1)[-1]
+                mime = next((m for m, e in MIME_EXT.items() if e == ext),
+                            "application/octet-stream")
+                with open(os.path.join(IMG_DIR, fn), "rb") as f:
+                    return mime, f.read()
+    except Exception:
+        pass
+    return None
+
+
+def _store_load():
+    """Re-read the tail of the JSONL log so history survives restarts/reboots."""
+    try:
+        with open(STORE) as f:
+            lines = f.readlines()[-REQUESTS.maxlen:]
+    except FileNotFoundError:
+        return
+    for ln in lines:
+        try:
+            REQUESTS.append(json.loads(ln))
+        except Exception:
+            pass
+    print(f"restored {len(REQUESTS)} requests from {STORE}", flush=True)
+
+
+def _store_append(rec):
+    """Append one record. Images are referenced by id, never inlined."""
+    try:
+        os.makedirs(os.path.dirname(STORE), exist_ok=True)
+        if os.path.exists(STORE) and os.path.getsize(STORE) > STORE_MAX_BYTES:
+            os.replace(STORE, STORE + ".1")
+        with open(STORE, "a") as f:
+            f.write(json.dumps(rec) + "\n")
+    except Exception:
+        pass
+
+
+def _record(rec):
+    with LOCK:
+        REQUESTS.append(rec)
+    _store_append(rec)
 
 
 def _auth_headers(extra=None):
@@ -125,9 +201,9 @@ def _harvest(messages):
                     key = f"{int(time.time()*1000)}_{len(IMAGES)}"
                     with LOCK:
                         IMAGES[key] = (mo.group(1), raw)
-                        # bound memory: keep the most recent 40 images
-                        for old in list(IMAGES)[:-40]:
+                        for old in list(IMAGES)[:-60]:
                             IMAGES.pop(old, None)
+                    _img_save(key, mo.group(1), raw)
                     imgs.append({"id": key, "mime": mo.group(1), "bytes": len(raw)})
                 else:
                     imgs.append({"id": None, "mime": "remote-url", "url": url[:200]})
@@ -158,8 +234,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, json.dumps(self._state()))
         if path.startswith("/img/"):
             key = path[5:]
-            with LOCK:
-                item = IMAGES.get(key)
+            item = _img_load(key)
             if not item:
                 return self._send(404, b"missing", "text/plain")
             mime, raw = item
@@ -237,13 +312,14 @@ class Handler(BaseHTTPRequestHandler):
         raw = self.rfile.read(n) if n else b""
         rec = {"t": time.strftime("%H:%M:%S"), "path": self.path, "images": [],
                "prompt_chars": 0, "text": "", "usage": None, "decode_tps": None,
-               "ttft_ms": None, "stream": False, "model": None}
+               "ttft_ms": None, "stream": False, "model": None,
+               "reply": "", "reasoning": "", "reply_chars": 0}
         try:
             body = json.loads(raw or b"{}")
             rec["model"] = body.get("model")
             rec["stream"] = bool(body.get("stream"))
             text, imgs = _harvest(body.get("messages"))
-            rec["text"] = text[-1200:]
+            rec["text"] = text[-8000:]
             rec["prompt_chars"] = len(text)
             rec["images"] = imgs
         except Exception:
@@ -258,8 +334,7 @@ class Handler(BaseHTTPRequestHandler):
             up = urllib.request.urlopen(req, timeout=3600)
         except Exception as e:
             rec["usage"] = {"error": str(e)}
-            with LOCK:
-                REQUESTS.append(rec)
+            _record(rec)
             return self._send(502, json.dumps({"error": str(e)}))
 
         ctype = up.headers.get("Content-Type", "application/json")
@@ -273,6 +348,7 @@ class Handler(BaseHTTPRequestHandler):
             ttft = None
             ntok = 0
             usage = None
+            reply_parts, reason_parts = [], []
             try:
                 for line in up:
                     self.wfile.write(line)
@@ -292,11 +368,16 @@ class Handler(BaseHTTPRequestHandler):
                         d_ = ch[0].get("delta") or {}
                         # Qwen3.8 streams thinking in `reasoning`/`reasoning_content`;
                         # counting only `content` badly undercounts decode t/s.
-                        if d_.get("content") or d_.get("reasoning") \
-                                or d_.get("reasoning_content"):
+                        c_ = d_.get("content")
+                        r_ = d_.get("reasoning") or d_.get("reasoning_content")
+                        if c_ or r_:
                             if ttft is None:
                                 ttft = time.time() - t0
                             ntok += 1
+                        if c_:
+                            reply_parts.append(c_)
+                        if r_:
+                            reason_parts.append(r_)
                     if o.get("usage"):
                         usage = o["usage"]
             except Exception:
@@ -306,8 +387,11 @@ class Handler(BaseHTTPRequestHandler):
             rec["usage"] = usage or {"completion_tokens": ntok}
             rec["ttft_ms"] = round((ttft or 0) * 1000)
             rec["decode_tps"] = round(tok / max(wall - (ttft or 0), 1e-6), 1)
-            with LOCK:
-                REQUESTS.append(rec)
+            full = "".join(reply_parts)
+            rec["reply_chars"] = len(full)
+            rec["reply"] = full[:8000]
+            rec["reasoning"] = "".join(reason_parts)[:8000]
+            _record(rec)
             return
 
         data = up.read()
@@ -322,101 +406,169 @@ class Handler(BaseHTTPRequestHandler):
             rt = (u_.get("completion_tokens_details") or {}).get("reasoning_tokens")
             if rt:
                 rec["reasoning_tokens"] = rt
+            ch = (o.get("choices") or [{}])[0]
+            msg = ch.get("message") or {}
+            full = msg.get("content") or ""
+            rec["reply_chars"] = len(full)
+            rec["reply"] = full[:8000]
+            rec["reasoning"] = (msg.get("reasoning")
+                                or msg.get("reasoning_content") or "")[:8000]
+            rec["finish"] = ch.get("finish_reason")
         except Exception:
             pass
-        with LOCK:
-            REQUESTS.append(rec)
+        _record(rec)
         self._send(200, data, ctype)
 
 
 PAGE = r"""<!doctype html><html><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>llama-server monitor</title><style>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<title>LLM monitor</title><style>
 :root{--bg:#0d1117;--panel:#161b22;--line:#30363d;--fg:#e6edf3;--dim:#8b949e;
       --ok:#3fb950;--busy:#d29922;--bad:#f85149;--accent:#58a6ff}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
-header{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;gap:16px;
+*{box-sizing:border-box;-webkit-tap-highlight-color:rgba(88,166,255,.15)}
+body{margin:0;background:var(--bg);color:var(--fg);
+     font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;
+     padding-bottom:env(safe-area-inset-bottom)}
+header{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;gap:8px;
        align-items:center;flex-wrap:wrap;position:sticky;top:0;background:var(--bg);z-index:5}
-h1{font-size:15px;margin:0;font-weight:600}
-.pill{padding:2px 9px;border-radius:99px;font-size:12px;border:1px solid var(--line)}
+h1{font-size:14px;margin:0 6px 0 0;font-weight:600;white-space:nowrap}
+.pill{padding:3px 9px;border-radius:99px;font-size:11.5px;border:1px solid var(--line);white-space:nowrap}
 .ok{color:var(--ok);border-color:var(--ok)} .busy{color:var(--busy);border-color:var(--busy)}
 .bad{color:var(--bad);border-color:var(--bad)}
-main{padding:16px;display:grid;gap:16px;grid-template-columns:1fr;max-width:1400px;margin:0 auto}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
-.card h2{font-size:12px;margin:0 0 10px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
-table{width:100%;border-collapse:collapse;font-size:12.5px}
-th{text-align:right;color:var(--dim);font-weight:500;padding:4px 8px;border-bottom:1px solid var(--line)}
-th:first-child,td:first-child{text-align:left}
-td{padding:5px 8px;border-bottom:1px solid #21262d;text-align:right;vertical-align:top}
-td.l{text-align:left}
+main{padding:12px;display:grid;gap:12px;max-width:1400px;margin:0 auto}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
+.card h2{font-size:11.5px;margin:0 0 10px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
+/* big TPS readout */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.stat{background:#0d1117;border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.stat .n{font-size:24px;font-weight:700;line-height:1.1}
+.stat .l{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+.stat.hi .n{color:var(--accent)}
 .imgs{display:flex;gap:8px;flex-wrap:wrap}
-.imgs a{display:block;border:1px solid var(--line);border-radius:6px;overflow:hidden}
-.imgs img{display:block;height:90px;width:auto}
-.txt{color:var(--dim);white-space:pre-wrap;word-break:break-word;max-height:78px;overflow:auto;
-     font-size:11.5px;margin-top:4px}
-.kv{display:flex;gap:20px;flex-wrap:wrap;color:var(--dim);font-size:12.5px}
-.kv b{color:var(--fg);font-weight:600}
+.imgs a{display:block;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.imgs img{display:block;height:88px;width:auto}
+/* request list: cards on mobile, table-ish on desktop */
+.req{border:1px solid var(--line);border-radius:8px;margin-bottom:8px;overflow:hidden}
+.req>summary{list-style:none;cursor:pointer;padding:10px 12px;display:flex;gap:10px;
+             flex-wrap:wrap;align-items:center;min-height:44px}
+.req>summary::-webkit-details-marker{display:none}
+.req>summary:active{background:#1c2129}
+.req .when{color:var(--dim);font-size:12px}
+.req .tps{color:var(--accent);font-weight:700}
+.req .meta{color:var(--dim);font-size:12px;margin-left:auto;text-align:right}
+.body{padding:0 12px 12px}
+.lbl{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;
+     margin:10px 0 4px;display:flex;gap:8px;align-items:center}
+.blk{white-space:pre-wrap;word-break:break-word;background:#0d1117;border:1px solid var(--line);
+     border-radius:6px;padding:9px;font-size:12.5px;max-height:320px;overflow:auto;
+     -webkit-overflow-scrolling:touch}
+.blk.reason{color:var(--dim)}
 .none{color:var(--dim);font-style:italic}
-@media(max-width:700px){.imgs img{height:64px}}
+.btn{background:#21262d;border:1px solid var(--line);color:var(--fg);border-radius:6px;
+     padding:6px 10px;font:inherit;font-size:12px;cursor:pointer;min-height:34px}
+.btn:active{background:#2d333b}
+@media(max-width:640px){
+  main{padding:8px;gap:8px} .card{padding:10px} h1{font-size:13px}
+  .stat .n{font-size:20px} .imgs img{height:66px}
+  .req .meta{margin-left:0;width:100%;text-align:left}
+  .blk{max-height:240px;font-size:12px}
+}
 </style></head><body>
 <header>
-  <h1>llama-server monitor</h1>
+  <h1>LLM monitor</h1>
   <span id="up" class="pill">…</span>
-  <span id="slot" class="pill">…</span>
-  <span id="ctx" class="pill"></span>
   <span id="be" class="pill"></span>
+  <span id="slot" class="pill"></span>
+  <span id="ctx" class="pill"></span>
   <span id="spec" class="pill"></span>
-  <span style="margin-left:auto;color:var(--dim);font-size:12px">refresh 2s · read-only</span>
 </header>
 <main>
-  <div class="card"><h2>server</h2><div id="params" class="kv"></div></div>
+  <div class="card"><h2>throughput</h2><div id="stats" class="stats"></div></div>
+  <div class="card"><h2>server</h2><div id="params" class="stats"></div></div>
   <div class="card"><h2>images seen in prompts</h2><div id="gallery" class="imgs"></div></div>
-  <div class="card"><h2>recent requests</h2>
-    <table><thead><tr><th>time</th><th>model</th><th>prompt tok</th><th>gen tok</th>
-      <th>reason tok</th><th>decode t/s</th><th>ttft ms</th><th>img</th></tr></thead>
-      <tbody id="rows"></tbody></table>
-    <div id="detail"></div>
-  </div>
+  <div class="card"><h2>requests <span id="cnt" style="color:var(--dim)"></span></h2>
+    <div id="rows"></div></div>
 </main>
 <script>
 const $=id=>document.getElementById(id);
+const esc=t=>(t||'').replace(/[<&>]/g,c=>({'<':'&lt;','&':'&amp;','>':'&gt;'}[c]));
+const open=new Set();                    // keep expanded rows open across refreshes
+let paused=false;
+
+function statCard(n,l,hi){return `<div class="stat${hi?' hi':''}"><div class="n">${n}</div><div class="l">${l}</div></div>`;}
+
 async function tick(){
+  if(paused) return;
   let d; try{ d=await (await fetch('/api/state')).json(); }catch(e){ return; }
-  $('up').textContent = d.ok ? 'upstream up' : 'upstream DOWN';
-  $('up').className = 'pill ' + (d.ok?'ok':'bad');
+  $('up').textContent=d.ok?'upstream up':'upstream DOWN';
+  $('up').className='pill '+(d.ok?'ok':'bad');
+  $('be').textContent=(d.backend||'')+(d.model_id?(' · '+d.model_id):'');
   const s=d.slot;
-  $('slot').textContent = s ? (s.busy?('BUSY task '+s.task):'idle') : 'slots n/a';
-  $('slot').className = 'pill ' + (s && s.busy ? 'busy':'ok');
-  $('ctx').textContent = d.n_ctx ? ('ctx '+d.n_ctx.toLocaleString()+(d.slots?(' · slots '+d.slots):'')) : '';
-  $('be').textContent = (d.backend||'') + (d.model_id?(' · '+d.model_id):'');
-  const mx = d.metrics||{};
-  $('spec').textContent = (mx.spec_accept_rate!=null)
-      ? ('spec accept '+(mx.spec_accept_rate*100).toFixed(1)+'%')
-      : (mx.kv_cache_used!=null ? ('kv '+(mx.kv_cache_used*100).toFixed(0)+'%') : '');
+  $('slot').textContent=s?(s.busy?('BUSY '+(s.task||'')):'idle'):'';
+  $('slot').className='pill '+(s&&s.busy?'busy':'ok');
+  $('ctx').textContent=d.n_ctx?('ctx '+d.n_ctx.toLocaleString()):'';
+  const mx=d.metrics||{};
+  $('spec').textContent=(mx.spec_accept_rate!=null)?('MTP accept '+(mx.spec_accept_rate*100).toFixed(1)+'%'):'';
+
+  const rs=d.requests||[];
+  const tps=rs.map(r=>r.decode_tps).filter(v=>typeof v==='number'&&v>0);
+  const last=tps.length?tps[0]:null;
+  const avg=tps.length?(tps.reduce((a,b)=>a+b,0)/tps.length):null;
+  const best=tps.length?Math.max(...tps):null;
+  $('stats').innerHTML=
+     statCard(last!=null?last.toFixed(1):'—','last decode t/s',true)
+    +statCard(avg!=null?avg.toFixed(1):'—','avg t/s (recent)')
+    +statCard(best!=null?best.toFixed(1):'—','best t/s')
+    +statCard(rs.length,'requests logged');
+
   const p=d.params||{};
-  $('params').innerHTML = Object.keys(p).length
-    ? Object.entries(p).map(([k,v])=>`${k} <b>${v}</b>`).join('')
+  $('params').innerHTML=Object.keys(p).length
+    ? Object.entries(p).map(([k,v])=>statCard(v,k)).join('')
     : '<span class="none">unavailable</span>';
 
-  const imgs=[];
-  (d.requests||[]).forEach(r=>(r.images||[]).forEach(i=>{ if(i.id) imgs.push(i); }));
-  $('gallery').innerHTML = imgs.length
-    ? imgs.slice(0,24).map(i=>`<a href="/img/${i.id}" target="_blank" title="${i.mime} · ${(i.bytes/1024).toFixed(0)} KB">
-         <img src="/img/${i.id}"></a>`).join('')
-    : '<span class="none">no images sent yet — send a request with an image_url part</span>';
+  const imgs=[]; rs.forEach(r=>(r.images||[]).forEach(i=>{if(i.id)imgs.push(i);}));
+  $('gallery').innerHTML=imgs.length
+    ? imgs.slice(0,24).map(i=>`<a href="/img/${i.id}" target="_blank"><img loading="lazy" src="/img/${i.id}"></a>`).join('')
+    : '<span class="none">no images yet — send an image_url part</span>';
 
-  $('rows').innerHTML = (d.requests||[]).map(r=>{
-    const u=r.usage||{};
-    return `<tr><td class="l">${r.t}</td><td class="l">${r.model||''}</td>
-      <td>${(u.prompt_tokens||'')}</td><td>${(u.completion_tokens||'')}</td>
-      <td>${(u.completion_tokens_details&&u.completion_tokens_details.reasoning_tokens)||r.reasoning_tokens||''}</td>
-      <td>${r.decode_tps??''}</td><td>${r.ttft_ms??''}</td>
-      <td>${(r.images||[]).length||''}</td></tr>
-      ${r.text?`<tr><td colspan="8" class="l"><div class="txt">${
-        r.text.replace(/[<&]/g,c=>({'<':'&lt;','&':'&amp;'}[c]))}</div></td></tr>`:''}`;
-  }).join('') || '<tr><td colspan="8" class="none">no requests captured yet</td></tr>';
+  $('cnt').textContent='('+rs.length+')';
+  $('rows').innerHTML = rs.length ? rs.map((r,i)=>{
+    const u=r.usage||{}, k=r.t+'|'+i;
+    const rt=(u.completion_tokens_details&&u.completion_tokens_details.reasoning_tokens)||r.reasoning_tokens||0;
+    return `<details class="req" data-k="${esc(k)}"${open.has(k)?' open':''}>
+      <summary>
+        <span class="when">${r.t}</span>
+        <span class="tps">${r.decode_tps!=null?r.decode_tps+' t/s':''}</span>
+        <span class="meta">${u.prompt_tokens||0} in · ${u.completion_tokens||0} out${rt?(' · '+rt+' think'):''}${r.ttft_ms?(' · ttft '+r.ttft_ms+'ms'):''}${(r.images||[]).length?(' · '+r.images.length+' img'):''}</span>
+      </summary>
+      <div class="body">
+        ${(r.images||[]).filter(i=>i.id).length?`<div class="lbl">images</div><div class="imgs">${
+          r.images.filter(i=>i.id).map(i=>`<a href="/img/${i.id}" target="_blank"><img loading="lazy" src="/img/${i.id}"></a>`).join('')}</div>`:''}
+        <div class="lbl">prompt${r.prompt_chars?(' · '+r.prompt_chars+' chars'):''}
+          <button class="btn" data-copy="p">copy</button></div>
+        <div class="blk" data-p>${esc(r.text)||'<span class="none">—</span>'}</div>
+        ${r.reasoning?`<div class="lbl">reasoning</div><div class="blk reason">${esc(r.reasoning)}</div>`:''}
+        <div class="lbl">response${r.reply_chars?(' · '+r.reply_chars+' chars'):''}
+          <button class="btn" data-copy="r">copy</button></div>
+        <div class="blk" data-r>${esc(r.reply)||'<span class="none">—</span>'}</div>
+      </div></details>`;
+  }).join('') : '<span class="none">no requests captured yet</span>';
 }
+
+// keep open/closed state; pause polling while a row is open so it doesn't jump
+document.addEventListener('toggle',e=>{
+  const d=e.target; if(!d.classList||!d.classList.contains('req'))return;
+  const k=d.dataset.k; d.open?open.add(k):open.delete(k);
+  paused=[...document.querySelectorAll('details.req')].some(x=>x.open);
+},true);
+document.addEventListener('click',e=>{
+  const b=e.target.closest('button[data-copy]'); if(!b)return;
+  e.preventDefault();
+  const box=b.closest('.body').querySelector(b.dataset.copy==='p'?'[data-p]':'[data-r]');
+  navigator.clipboard&&navigator.clipboard.writeText(box.innerText);
+  b.textContent='copied'; setTimeout(()=>b.textContent='copy',1200);
+});
 tick(); setInterval(tick,2000);
 </script></body></html>"""
 
@@ -440,7 +592,9 @@ def main():
             if "=" in kv:
                 k, v = kv.split("=", 1)
                 SERVER_PARAMS[k.strip()] = v.strip()
+    _store_load()
     print(f"monitor  http://{args.bind}:{args.port}/   ->  upstream {UPSTREAM}", flush=True)
+    print(f"persisting to {STORE}", flush=True)
     print(f"point clients at http://<host>:{args.port}/v1 to capture their traffic", flush=True)
     ThreadingHTTPServer((args.bind, args.port), Handler).serve_forever()
 
