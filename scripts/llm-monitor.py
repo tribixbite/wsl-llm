@@ -32,6 +32,11 @@ UPSTREAM = "http://127.0.0.1:8080"
 API_KEY = ""                       # injected upstream auth (vLLM etc.)
 BACKEND = None                     # "llama.cpp" | "vllm" | None (auto-detected once)
 SERVER_PARAMS = {}                 # shown on the dashboard (vLLM has no /props)
+PORT = 8090
+LAN_HOST = ""
+MODEL_NAME = "unknown"
+CTX_LEN = None
+MAX_TOKENS_HINT = 4000
 REQUESTS = deque(maxlen=500)      # newest last
 STORE = os.path.expanduser("~/.local/share/llm-monitor/requests.jsonl")
 STORE_MAX_BYTES = 64 * 1024 * 1024   # rotate past this
@@ -177,6 +182,124 @@ def _vllm_metrics():
     return out
 
 
+def _guess_lan_ip():
+    """Best-effort LAN address to advertise to other machines."""
+    import socket
+    try:
+        s_ = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s_.connect(("8.8.8.8", 80))
+        ip = s_.getsockname()[0]
+        s_.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
+
+def _server_cmdline():
+    """The exact command line currently serving the upstream model."""
+    try:
+        import subprocess
+        out = subprocess.run(["ps", "-eo", "pid,args"], capture_output=True,
+                             text=True, timeout=5).stdout
+    except Exception:
+        return None
+    port = UPSTREAM.rsplit(":", 1)[-1].strip("/")
+    best = None
+    for line in out.splitlines():
+        low = line.lower()
+        if "llm-monitor" in low or " ps -eo" in low:
+            continue
+        if not any(t in low for t in ("vllm", "llama-server", "ninfer", "sglang")):
+            continue
+        if port and port in line:
+            return line.strip().split(None, 1)[-1]
+        best = best or line.strip().split(None, 1)[-1]
+    return best
+
+
+def _connect_info():
+    """Everything a client (or an agent) needs to talk to this endpoint."""
+    be = _detect_backend()
+    host = LAN_HOST or "127.0.0.1"
+    base = f"http://{host}:{PORT}/v1"
+    model, ctx = MODEL_NAME, CTX_LEN
+    if be == "vllm":
+        try:
+            m = _get_json("/v1/models")["data"][0]
+            model = m.get("id") or model
+            ctx = m.get("max_model_len") or ctx
+        except Exception:
+            pass
+    elif be == "llama.cpp":
+        try:
+            pr = _get_json("/props")
+            ctx = (pr.get("default_generation_settings") or {}).get("n_ctx") or ctx
+            model = os.path.basename(pr.get("model_path") or "") or model
+        except Exception:
+            pass
+    samp = SERVER_PARAMS or {"temperature": "1.0", "top_p": "0.95", "top_k": "20"}
+    max_tok = MAX_TOKENS_HINT
+    body = {
+        "model": model,
+        "messages": [{"role": "user", "content": "hello"}],
+        "max_tokens": max_tok,
+        **{k: (float(v) if "." in str(v) else int(v)) if str(v).replace(".", "", 1).isdigit()
+           else v for k, v in samp.items()},
+    }
+    curl = ("curl " + base + "/chat/completions \\\n"
+            "  -H 'Content-Type: application/json' \\\n"
+            "  -d '" + json.dumps(body) + "'")
+    py = ("from openai import OpenAI\n"
+          f"c = OpenAI(base_url=\"{base}\", api_key=\"not-needed\")\n"
+          f"r = c.chat.completions.create(model=\"{model}\",\n"
+          "        messages=[{\"role\":\"user\",\"content\":\"hello\"}],\n"
+          f"        max_tokens={max_tok}, temperature={samp.get('temperature','1.0')},"
+          f" top_p={samp.get('top_p','0.95')})")
+    return {
+        "openai_base_url": base,
+        "openai_base_url_local": f"http://127.0.0.1:{PORT}/v1",
+        "upstream_direct": UPSTREAM + "/v1",
+        "model": model,
+        "api_key_required": False,
+        "api_key": "not-needed",
+        "context_length": ctx,
+        "recommended_max_tokens": max_tok,
+        "min_max_tokens": 1000,
+        "max_tokens_note": ("Thinking is emitted before the answer and consumes the same "
+                            "budget; small max_tokens returns empty content."),
+        "sampling": samp,
+        "backend": be,
+        "server_command": _server_cmdline(),
+        "endpoints": {
+            "chat_completions": base + "/chat/completions",
+            "completions": base + "/completions",
+            "models": base + "/models",
+            "dashboard": f"http://{host}:{PORT}/",
+            "state_json": f"http://{host}:{PORT}/api/state",
+            "connect_json": f"http://{host}:{PORT}/api/connect",
+            "api_index": f"http://{host}:{PORT}/api",
+        },
+        "clients": {
+            "anythingllm": {
+                "LLM Provider": "Generic OpenAI",
+                "Base URL": base,
+                "API Key": "not-needed",
+                "Chat Model Name": model,
+                "Token context window": ctx,
+                "Max Tokens": max_tok,
+            },
+            "open_webui": {"OPENAI_API_BASE_URL": base, "OPENAI_API_KEY": "not-needed"},
+            "aider": f"OPENAI_API_BASE={base} OPENAI_API_KEY=x aider --model openai/{model}",
+            "continue_dev": {"provider": "openai", "apiBase": base, "model": model,
+                             "contextLength": ctx},
+            "litellm": {"model_name": model,
+                        "litellm_params": {"model": f"openai/{model}",
+                                           "api_base": base, "api_key": "not-needed"}},
+        },
+        "examples": {"curl": curl, "python_openai_sdk": py},
+    }
+
+
 def _harvest(messages):
     """Pull plain text and any inline images out of an OpenAI messages array."""
     texts, imgs = [], []
@@ -232,6 +355,26 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, PAGE, "text/html; charset=utf-8")
         if path == "/api/state":
             return self._send(200, json.dumps(self._state()))
+        if path in ("/api/connect", "/.well-known/llm-endpoint.json", "/connect.json"):
+            return self._send(200, json.dumps(_connect_info(), indent=2))
+        if path in ("/api", "/api/"):
+            # discovery index: an agent hitting the root API learns every route
+            info = _connect_info()
+            return self._send(200, json.dumps({
+                "service": "llm-monitor",
+                "description": "OpenAI-compatible proxy + dashboard in front of a local LLM server",
+                "openai_base_url": info["openai_base_url"],
+                "model": info["model"],
+                "context_length": info["context_length"],
+                "recommended_max_tokens": info["recommended_max_tokens"],
+                "routes": {
+                    "GET /api": "this index",
+                    "GET /api/connect": "full connection + client config (curl, python, AnythingLLM, ...)",
+                    "GET /api/state": "live stats, recent requests with prompt/response",
+                    "GET /img/<id>": "an image seen in a prompt",
+                    "POST /v1/chat/completions": "proxied to upstream, captured",
+                    "GET /v1/models": "proxied to upstream",
+                }}, indent=2))
         if path.startswith("/img/"):
             key = path[5:]
             item = _img_load(key)
@@ -485,6 +628,10 @@ main{padding:12px;display:grid;gap:12px;max-width:1400px;margin:0 auto}
 </header>
 <main>
   <div class="card"><h2>throughput</h2><div id="stats" class="stats"></div></div>
+  <details class="card" id="conncard"><summary style="cursor:pointer;list-style:none;
+      font-size:11.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em">
+      connect / client settings &nbsp;<span style="color:var(--accent)">tap to expand</span></summary>
+    <div id="conn"></div></details>
   <div class="card"><h2>server</h2><div id="params" class="stats"></div></div>
   <div class="card"><h2>images seen in prompts</h2><div id="gallery" class="imgs"></div></div>
   <div class="card"><h2>requests <span id="cnt" style="color:var(--dim)"></span></h2>
@@ -569,7 +716,34 @@ document.addEventListener('click',e=>{
   navigator.clipboard&&navigator.clipboard.writeText(box.innerText);
   b.textContent='copied'; setTimeout(()=>b.textContent='copy',1200);
 });
-tick(); setInterval(tick,2000);
+async function conn(){
+  let d; try{ d=await (await fetch('/api/connect')).json(); }catch(e){ return; }
+  const row=(k,v)=>`<div class="lbl" style="margin:8px 0 3px">${k}
+      <button class="btn" data-val="${esc(String(v))}">copy</button></div>
+      <div class="blk" style="max-height:none">${esc(String(v))}</div>`;
+  const a=d.clients.anythingllm;
+  $('conn').innerHTML =
+     row('OpenAI Base URL (LAN)', d.openai_base_url)
+    +row('Model name', d.model)
+    +row('API key', d.api_key + '  (any non-empty string works)')
+    +row('Context length', d.context_length)
+    +row('max_tokens (recommended)', d.recommended_max_tokens + '   — minimum ' + d.min_max_tokens + '. ' + d.max_tokens_note)
+    +row('Sampling', Object.entries(d.sampling).map(([k,v])=>k+'='+v).join('  '))
+    +`<div class="lbl" style="margin:14px 0 3px">AnythingLLM / Generic-OpenAI client</div>
+      <div class="blk" style="max-height:none">${esc(Object.entries(a).map(([k,v])=>k+': '+v).join('\n'))}</div>`
+    +row('aider', d.clients.aider)
+    +row('curl', d.examples.curl)
+    +row('python (openai sdk)', d.examples.python_openai_sdk)
+    +row('server command now running', d.server_command||'(not detected)')
+    +`<div class="lbl" style="margin:14px 0 3px">machine-readable</div>
+      <div class="blk" style="max-height:none">GET ${esc(d.endpoints.connect_json)}\nGET ${esc(d.endpoints.api_index)}</div>`;
+}
+document.addEventListener('click',e=>{
+  const b=e.target.closest('button[data-val]'); if(!b)return;
+  e.preventDefault(); navigator.clipboard&&navigator.clipboard.writeText(b.dataset.val);
+  b.textContent='copied'; setTimeout(()=>b.textContent='copy',1200);
+});
+conn(); tick(); setInterval(tick,2000); setInterval(conn,30000);
 </script></body></html>"""
 
 
@@ -581,11 +755,18 @@ def main():
     ap.add_argument("--bind", default="0.0.0.0")
     ap.add_argument("--api-key", default="",
                     help="upstream API key, injected when the client sends none")
+    ap.add_argument("--lan-host", default="",
+                    help="hostname/IP to advertise in /api/connect (default: autodetect)")
+    ap.add_argument("--max-tokens-hint", type=int, default=4000,
+                    help="max_tokens recommended to clients in /api/connect")
     ap.add_argument("--params", default="",
                     help='sampling defaults to display, e.g. "temperature=1.0,top_p=0.95"')
     args = ap.parse_args()
     UPSTREAM = args.upstream.rstrip("/")
-    global API_KEY, SERVER_PARAMS
+    global API_KEY, SERVER_PARAMS, PORT, LAN_HOST, MAX_TOKENS_HINT
+    PORT = args.port
+    MAX_TOKENS_HINT = args.max_tokens_hint
+    LAN_HOST = args.lan_host or _guess_lan_ip()
     API_KEY = args.api_key
     if args.params:
         for kv in args.params.split(","):
@@ -595,6 +776,7 @@ def main():
     _store_load()
     print(f"monitor  http://{args.bind}:{args.port}/   ->  upstream {UPSTREAM}", flush=True)
     print(f"persisting to {STORE}", flush=True)
+    print(f"connect info  http://{LAN_HOST}:{args.port}/api/connect", flush=True)
     print(f"point clients at http://<host>:{args.port}/v1 to capture their traffic", flush=True)
     ThreadingHTTPServer((args.bind, args.port), Handler).serve_forever()
 
