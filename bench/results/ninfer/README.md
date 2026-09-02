@@ -40,3 +40,26 @@ NInfer rejects `chat_template_kwargs.reasoning_effort` with
 `chat_template_option_not_supported` (HTTP 400) and wants the **OpenAI top-level
 `reasoning_effort`** field instead. vLLM/llama.cpp want the kwargs form.
 `bench/aider_multi.py --effort-style top_level|kwargs` handles both.
+
+## Vision — verified end-to-end THROUGH the monitor proxy
+
+NInfer with `--vision` (32k ctx; adds `media-workers=16`, 1 GiB media cache, 2 GiB
+media-live). Client → monitor proxy :8091 → NInfer :8086, image sent as a standard
+OpenAI `image_url` data-URI:
+
+| temp | reply | correct? |
+|---|---|---|
+| 1.0 | `TEST-7428` | ✗ one digit wrong |
+| 0.3 | `TEST-7429` | ✓ |
+| 0.3 (repeat) | `TEST-7429` | ✓ |
+
+Ground truth is `TEST-7429`. **The temp-1.0 misread is sampling noise, not a vision
+limitation** — so use the Qwen thinking default (temp 1.0) for reasoning/coding, but
+drop to ~0.2–0.3 for exact transcription (OCR, reading codes, copying strings
+verbatim). Decode with an image in context: **34.5 t/s**.
+
+The proxy captured the request, the image, and the reply; the image is written to
+`~/.local/share/llm-monitor/images/` and served back from disk after restarts.
+
+**Note:** the production vLLM stack on :8090 CANNOT do this — it runs
+`--language-model-only`. Vision needs NInfer `--vision` or llama.cpp + mmproj.
