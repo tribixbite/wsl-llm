@@ -13,3 +13,6 @@ q38-vllm-MTP4-n1	json	124.07	171	800	6.62
 q38-Q3KXL-1gpu-MTP-vision	prose	36.91	801	800	22.48
 q38-Q3KXL-1gpu-MTP-vision	code	52.71	820	800	16.00
 q38-Q3KXL-1gpu-MTP-vision	json	53.45	2576	800	17.54
+vllm-VISION-via-proxy	prose	68.68	146	800	11.79
+vllm-VISION-via-proxy	code	106.40	143	800	7.66
+vllm-VISION-via-proxy	json	110.94	145	800	7.36

@@ -9,6 +9,7 @@ All client traffic goes through the monitor proxy so the web dashboard sees ever
 | **Model name** | `qwen3.8-27b` |
 | **API key** | *none required* — the proxy injects the upstream key |
 | **Context (`max_model_len`)** | **65536** (64k) |
+| **Vision** | ✅ **enabled** — send OpenAI `image_url` parts |
 | **`max_tokens` to send** | **≥1000**, recommend **4000–8000** (see "thinking" below) |
 | **Web dashboard** | `http://192.168.1.32:8090/` |
 | **Direct upstream (bypasses dashboard)** | `http://192.168.1.32:18020/v1`, key `c67e38c5fc66f203348ff28ad05e41d552eb56a96e5b9f10` |
@@ -64,10 +65,16 @@ Repo: [`syv-ai/qwen38-27b-rtx3090`](https://github.com/syv-ai/qwen38-27b-rtx3090
 
 ```bash
 cd ~/qwen38-vllm
+VISION=1 VISION_OFFLOAD=1 \
 MODEL=$HOME/qwen38-vllm/models2/Qwen3.8-27B-W4A16-AutoRound \
 MAX_SEQS=1 \
 bash single-user/start_qwen.sh
 ```
+
+`VISION=1` adds the vision tower (only **0.858 GiB**, kept in pinned host RAM by
+`VISION_OFFLOAD=1`). Measured cost: **105.0 → 95.3 t/s (−9%)** for full image support
+— the best speed/vision trade available on one card. Verified reading `TEST-7429`
+from a test image through the proxy in 3.1 s.
 
 which expands to:
 
