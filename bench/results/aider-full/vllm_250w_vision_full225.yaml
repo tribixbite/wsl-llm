@@ -1,0 +1,26 @@
+- dirname: 2026-09-03-01-39-28--3090-vllm-w4a16-mtp-vision-250W
+  test_cases: 225
+  model: qwen3.8-27b
+  edit_format: whole
+  commit_hash: ace084d
+  pass_rate_1: 29.3
+  pass_rate_2: 45.3
+  pass_num_1: 66
+  pass_num_2: 102
+  percent_cases_well_formed: 92.4
+  error_outputs: 0
+  num_malformed_responses: 22
+  num_with_malformed_responses: 17
+  user_asks: 0
+  lazy_comments: 0
+  syntax_errors: 0
+  indentation_errors: 0
+  exhausted_context_windows: 21
+  prompt_tokens: 392271
+  completion_tokens: 1223742
+  test_timeouts: 1
+  total_tests: 225
+  command: aider --model openai/qwen3.8-27b
+  date: 2026-09-03
+  versions: aider_multi.py-1.0
+  seconds_per_case: 58.1

@@ -14,6 +14,7 @@ Usage:
       --effort medium --out results.json
 """
 import argparse, json, os, re, shutil, subprocess, sys, tempfile, time, urllib.request, glob
+import threading, concurrent.futures as cf
 
 ROOT = os.path.expanduser("~/polyglot-benchmark")
 
@@ -127,8 +128,13 @@ LANG_TIMEOUT = {"python": 120, "javascript": 180, "java": 420,
 
 def run_tests(lang, ex_dir, name, code, py, timeout=None):
     timeout = timeout or LANG_TIMEOUT.get(lang, 300)
-    with tempfile.TemporaryDirectory() as td:
-        shutil.copytree(ex_dir, td, dirs_exist_ok=True)
+    with tempfile.TemporaryDirectory() as parent:
+        # exercism's cpp CMakeLists and java gradle derive the target/project name
+        # from the DIRECTORY name, so the copy must keep the exercise's own name.
+        # Copying into a random tmpdir silently breaks them ("No SOURCES given to
+        # target"), which scored all of cpp and java 0% before this was fixed.
+        td = os.path.join(parent, name)
+        shutil.copytree(ex_dir, td)
         sol = solution_file(lang, td, name)
         if not sol:
             return False, "no solution file"
@@ -196,6 +202,9 @@ def main():
                     help="Qwen3.8 thinking default is 1.0 (temp 0 cripples this model)")
     ap.add_argument("--top-p", type=float, default=0.95)
     ap.add_argument("--top-k", type=int, default=20)
+    ap.add_argument("--jobs", type=int, default=1,
+                    help="parallel exercises; needs a server with >1 slot "
+                         "(vLLM MAX_SEQS=N, llama.cpp -np N)")
     ap.add_argument("--tag", default="", help="dirname tag, e.g. 3090-vllm-vision-250W")
     ap.add_argument("--edit-format", default="whole",
                     help="reported in the YAML; this harness sends whole files")
@@ -209,67 +218,90 @@ def main():
 
     rows = []
     t0 = time.time()
+
+    tasks = []
     for lang in args.langs.split(","):
         lang = lang.strip()
-        if lang not in LANGS: continue
+        if lang not in LANGS:
+            continue
         pdir = practice(lang)
         if not os.path.isdir(pdir):
-            print(f"[{lang}] no exercises at {pdir}", flush=True); continue
-        names = sorted(d for d in os.listdir(pdir) if os.path.isdir(os.path.join(pdir, d)))[:args.n]
-        for i, name in enumerate(names, 1):
-            ex_dir = os.path.join(pdir, name)
-            sol, prompt = build_prompt(lang, ex_dir, name)
-            if not sol or not os.path.exists(sol):
-                continue
-            base = os.path.basename(sol)
-            msgs = [{"role": "user", "content": prompt}]
-            p1 = p2 = False; secs = 0.0; tail = ""; malformed = False
-            try:
-                ts = time.time()
-                reply, meta = call(args.url, args.model, args.key, msgs, args.max_tokens,
-                                   effort=args.effort, think=args.think)
-                secs += time.time() - ts
+            print(f"[{lang}] no exercises at {pdir}", flush=True)
+            continue
+        for name in sorted(d for d in os.listdir(pdir)
+                           if os.path.isdir(os.path.join(pdir, d)))[:args.n]:
+            tasks.append((lang, name))
+
+    lock = threading.Lock()
+    done = [0]
+
+    def work(task):
+        lang, name = task
+        ex_dir = os.path.join(practice(lang), name)
+        sol, prompt = build_prompt(lang, ex_dir, name)
+        if not sol or not os.path.exists(sol):
+            return None
+        base = os.path.basename(sol)
+        msgs = [{"role": "user", "content": prompt}]
+        p1 = p2 = False; secs = 0.0; tail = ""; malformed = False
+        try:
+            ts = time.time()
+            reply, meta = call(args.url, args.model, args.key, msgs, args.max_tokens,
+                               effort=args.effort, think=args.think)
+            secs += time.time() - ts
+            with lock:
                 STATS["prompt_tokens"] += meta["prompt_tokens"]
                 STATS["completion_tokens"] += meta["completion_tokens"]
                 if meta["finish_reason"] == "length":
                     STATS["exhausted_context_windows"] += 1
-                code = extract_code(reply)
-                if not code_block_found(reply):
-                    STATS["num_malformed_responses"] += 1
-                    malformed = True
-                ok, tail = run_tests(lang, ex_dir, name, code, args.py)
-                if tail == "TIMEOUT" or str(tail).startswith("TIMEOUT"):
-                    STATS["test_timeouts"] += 1
-                p1 = p2 = ok
-                if not ok and args.tries > 1:
-                    msgs += [{"role": "assistant", "content": reply},
-                             {"role": "user", "content": RETRY.format(
-                                 output=tail, base=base, fence=LANGS[lang]["fence"])}]
-                    ts = time.time()
-                    reply2, meta2 = call(args.url, args.model, args.key, msgs,
-                                         args.max_tokens, effort=args.effort,
-                                         think=args.think)
-                    secs += time.time() - ts
+            code = extract_code(reply)
+            if not code_block_found(reply):
+                with lock: STATS["num_malformed_responses"] += 1
+                malformed = True
+            ok, tail = run_tests(lang, ex_dir, name, code, args.py)
+            if str(tail).startswith("TIMEOUT"):
+                with lock: STATS["test_timeouts"] += 1
+            p1 = p2 = ok
+            if not ok and args.tries > 1:
+                msgs += [{"role": "assistant", "content": reply},
+                         {"role": "user", "content": RETRY.format(
+                             output=tail, base=base, fence=LANGS[lang]["fence"])}]
+                ts = time.time()
+                reply2, meta2 = call(args.url, args.model, args.key, msgs,
+                                     args.max_tokens, effort=args.effort,
+                                     think=args.think)
+                secs += time.time() - ts
+                with lock:
                     STATS["prompt_tokens"] += meta2["prompt_tokens"]
                     STATS["completion_tokens"] += meta2["completion_tokens"]
                     if meta2["finish_reason"] == "length":
                         STATS["exhausted_context_windows"] += 1
-                    if not code_block_found(reply2):
-                        STATS["num_malformed_responses"] += 1
-                        malformed = True
-                    p2, tail = run_tests(lang, ex_dir, name, extract_code(reply2), args.py)
-            except Exception as e:
-                tail = f"ERR {e!r}"
-                STATS["error_outputs"] += 1
-            if malformed:
-                STATS["num_with_malformed_responses"] += 1
-            rows.append({"lang": lang, "name": name, "pass1": p1, "pass2": p2,
-                         "secs": round(secs, 1), "malformed": malformed})
+                if not code_block_found(reply2):
+                    with lock: STATS["num_malformed_responses"] += 1
+                    malformed = True
+                p2, tail = run_tests(lang, ex_dir, name, extract_code(reply2), args.py)
+        except Exception as e:
+            tail = f"ERR {e!r}"
+            with lock: STATS["error_outputs"] += 1
+        if malformed:
+            with lock: STATS["num_with_malformed_responses"] += 1
+        rec = {"lang": lang, "name": name, "pass1": p1, "pass2": p2,
+               "secs": round(secs, 1), "malformed": malformed}
+        with lock:
+            done[0] += 1
             mark = "PASS" if p1 else ("PASS@2" if p2 else "FAIL")
-            print(f"[{lang} {i}/{len(names)}] {name:26} {mark:7} ({secs:.0f}s)", flush=True)
+            print(f"[{done[0]}/{len(tasks)}] {lang:11}{name:26} {mark:7} ({secs:.0f}s)",
+                  flush=True)
             if args.out:
                 with open(args.out + ".jsonl", "a") as f:
-                    f.write(json.dumps(rows[-1]) + "\n")
+                    f.write(json.dumps(rec) + "\n")
+        return rec
+
+    if args.jobs > 1:
+        with cf.ThreadPoolExecutor(max_workers=args.jobs) as ex:
+            rows = [r for r in ex.map(work, tasks) if r]
+    else:
+        rows = [r for r in (work(t) for t in tasks) if r]
 
     n = len(rows)
     p1n = sum(r["pass1"] for r in rows)
