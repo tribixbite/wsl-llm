@@ -197,8 +197,21 @@ def _guess_lan_ip():
 
 def _server_cmdline():
     """The exact command line currently serving the upstream model."""
+    import subprocess
+    if os.name == "nt":
+        # ps(1) does not exist here; ask WMI for the serving process instead.
+        try:
+            ps1 = ("Get-CimInstance Win32_Process -Filter \"Name='llama-server.exe' "
+                   "or Name='python.exe'\" | ForEach-Object { $_.CommandLine }")
+            out = subprocess.run(["powershell.exe", "-NoProfile", "-Command", ps1],
+                                 capture_output=True, text=True, timeout=15).stdout
+            for line in out.splitlines():
+                if "llama-server" in line.lower() and "llm-monitor" not in line.lower():
+                    return line.strip()
+        except Exception:
+            pass
+        return None
     try:
-        import subprocess
         out = subprocess.run(["ps", "-eo", "pid,args"], capture_output=True,
                              text=True, timeout=5).stdout
     except Exception:
@@ -235,6 +248,17 @@ def _connect_info():
             pr = _get_json("/props")
             ctx = (pr.get("default_generation_settings") or {}).get("n_ctx") or ctx
             model = os.path.basename(pr.get("model_path") or "") or model
+        except Exception:
+            pass
+        # /props reports the .gguf PATH, but the id clients must send is whatever
+        # llama-server was started with as --alias. Prefer what /v1/models
+        # advertises; fall back to the filename only if that call fails.
+        try:
+            ms = _get_json("/v1/models")
+            entries = ms.get("data") or ms.get("models") or []
+            mid = (entries[0].get("id") or entries[0].get("name")) if entries else None
+            if mid:
+                model = mid
         except Exception:
             pass
     samp = SERVER_PARAMS or {"temperature": "1.0", "top_p": "0.95", "top_k": "20"}
