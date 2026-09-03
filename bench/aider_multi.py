@@ -18,9 +18,12 @@ import argparse, json, os, re, shutil, subprocess, sys, tempfile, time, urllib.r
 ROOT = os.path.expanduser("~/polyglot-benchmark")
 
 LANGS = {
-    "python":     {"ext": "py", "sep": "_", "fence": "python"},
-    "javascript": {"ext": "js", "sep": "-", "fence": "javascript"},
-    "java":       {"ext": "java", "sep": "", "fence": "java"},
+    "python":     {"fence": "python"},
+    "javascript": {"fence": "javascript"},
+    "java":       {"fence": "java"},
+    "cpp":        {"fence": "cpp"},
+    "go":         {"fence": "go"},
+    "rust":       {"fence": "rust"},
 }
 
 def read(p):
@@ -40,6 +43,18 @@ def solution_file(lang, ex_dir, name):
     if lang == "java":
         cand = glob.glob(os.path.join(ex_dir, "src", "main", "java", "*.java"))
         return cand[0] if cand else ""
+    if lang == "cpp":
+        # implementation file, not the header and not the *_test.cpp
+        cand = [f for f in glob.glob(os.path.join(ex_dir, "*.cpp"))
+                if not f.endswith("_test.cpp")]
+        return cand[0] if cand else ""
+    if lang == "go":
+        cand = [f for f in glob.glob(os.path.join(ex_dir, "*.go"))
+                if not f.endswith("_test.go")]
+        return cand[0] if cand else ""
+    if lang == "rust":
+        p_ = os.path.join(ex_dir, "src", "lib.rs")
+        return p_ if os.path.exists(p_) else ""
     return ""
 
 def build_prompt(lang, ex_dir, name):
@@ -91,7 +106,12 @@ def call(url, model, key, messages, max_tokens, timeout=900, effort=None, think=
 
 JS_CACHE = os.path.expanduser("~/.cache/aider_multi_node_modules")
 
-def run_tests(lang, ex_dir, name, code, py, timeout=300):
+LANG_TIMEOUT = {"python": 120, "javascript": 180, "java": 420,
+                "cpp": 420, "go": 300, "rust": 600}
+
+
+def run_tests(lang, ex_dir, name, code, py, timeout=None):
+    timeout = timeout or LANG_TIMEOUT.get(lang, 300)
     with tempfile.TemporaryDirectory() as td:
         shutil.copytree(ex_dir, td, dirs_exist_ok=True)
         sol = solution_file(lang, td, name)
@@ -118,6 +138,17 @@ def run_tests(lang, ex_dir, name, code, py, timeout=300):
             elif lang == "java":
                 os.chmod(os.path.join(td, "gradlew"), 0o755)
                 cmd = ["./gradlew", "test", "--offline", "-q", "--console=plain"]
+            elif lang == "cpp":
+                # exercism cpp ships CMakeLists + a bundled test framework
+                cmd = ["bash", "-lc",
+                       "cmake -S . -B build -DEXERCISM_RUN_ALL_TESTS=1 "
+                       "-DCMAKE_BUILD_TYPE=Release >/dev/null && "
+                       "cmake --build build -j4 >/dev/null && ctest --test-dir build "
+                       "--output-on-failure"]
+            elif lang == "go":
+                cmd = ["go", "test", "./..."]
+            elif lang == "rust":
+                cmd = ["cargo", "test", "--offline", "--quiet"]
             else:
                 cmd = None
             if not cmd:
@@ -200,19 +231,38 @@ def main():
                 with open(args.out + ".jsonl", "a") as f:
                     f.write(json.dumps(rows[-1]) + "\n")
 
-    print("\n=== RESULTS ===")
+    print("\n" + "=" * 62)
+    print(f"  aider polyglot  ·  {args.model}  ·  {len(rows)} exercises")
+    print("=" * 62)
+    print(f"  {'language':<12}{'n':>5}{'pass@1':>10}{'pass@2':>10}{'avg s/ex':>11}")
+    print("  " + "-" * 46)
     for lang in sorted(set(r["lang"] for r in rows)):
         sub = [r for r in rows if r["lang"] == lang]
         n = len(sub)
-        print(f"  {lang:11} n={n:3}  pass@1={sum(r['pass1'] for r in sub)/n:6.1%}  "
-              f"pass@2={sum(r['pass2'] for r in sub)/n:6.1%}")
+        print(f"  {lang:<12}{n:>5}{sum(r['pass1'] for r in sub)/n:>9.1%}"
+              f"{sum(r['pass2'] for r in sub)/n:>10.1%}"
+              f"{sum(r['secs'] for r in sub)/n:>11.1f}")
     n = len(rows)
     if n:
-        print(f"  {'OVERALL':11} n={n:3}  pass@1={sum(r['pass1'] for r in rows)/n:6.1%}  "
-              f"pass@2={sum(r['pass2'] for r in rows)/n:6.1%}")
-    print(f"  wall={time.time()-t0:.0f}s")
+        p1 = sum(r["pass1"] for r in rows) / n
+        p2 = sum(r["pass2"] for r in rows) / n
+        print("  " + "-" * 46)
+        print(f"  {'TOTAL':<12}{n:>5}{p1:>9.1%}{p2:>10.1%}"
+              f"{sum(r['secs'] for r in rows)/n:>11.1f}")
+        print()
+        print(f"  pass@2 = {p2:.1%}   <- the aider leaderboard headline metric")
+        print(f"  edit format: whole      attempts: {args.tries}      "
+              f"temp: {SAMPLING['temperature']}")
+        eff = args.effort or ("think" if args.think else "default")
+        print(f"  reasoning_effort: {eff}      wall: {time.time()-t0:.0f}s")
     if args.out:
-        json.dump({"model": args.model, "rows": rows}, open(args.out, "w"), indent=2)
+        json.dump({"model": args.model, "n": n,
+                   "pass1": (sum(r["pass1"] for r in rows) / n) if n else 0,
+                   "pass2": (sum(r["pass2"] for r in rows) / n) if n else 0,
+                   "sampling": SAMPLING, "tries": args.tries,
+                   "effort": args.effort, "edit_format": "whole",
+                   "rows": rows}, open(args.out, "w"), indent=2)
+
 
 if __name__ == "__main__":
     main()

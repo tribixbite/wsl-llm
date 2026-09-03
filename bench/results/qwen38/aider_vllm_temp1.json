@@ -1,0 +1,523 @@
+{
+  "model": "qwen3.8-27b",
+  "rows": [
+    {
+      "lang": "python",
+      "name": "affine-cipher",
+      "pass1": true,
+      "pass2": true,
+      "secs": 20.0
+    },
+    {
+      "lang": "python",
+      "name": "beer-song",
+      "pass1": true,
+      "pass2": true,
+      "secs": 13.7
+    },
+    {
+      "lang": "python",
+      "name": "book-store",
+      "pass1": false,
+      "pass2": false,
+      "secs": 97.5
+    },
+    {
+      "lang": "python",
+      "name": "bottle-song",
+      "pass1": false,
+      "pass2": true,
+      "secs": 17.7
+    },
+    {
+      "lang": "python",
+      "name": "bowling",
+      "pass1": true,
+      "pass2": true,
+      "secs": 59.9
+    },
+    {
+      "lang": "python",
+      "name": "connect",
+      "pass1": true,
+      "pass2": true,
+      "secs": 99.7
+    },
+    {
+      "lang": "python",
+      "name": "dominoes",
+      "pass1": false,
+      "pass2": true,
+      "secs": 54.9
+    },
+    {
+      "lang": "python",
+      "name": "dot-dsl",
+      "pass1": false,
+      "pass2": false,
+      "secs": 48.5
+    },
+    {
+      "lang": "python",
+      "name": "food-chain",
+      "pass1": false,
+      "pass2": true,
+      "secs": 46.0
+    },
+    {
+      "lang": "python",
+      "name": "forth",
+      "pass1": false,
+      "pass2": false,
+      "secs": 129.3
+    },
+    {
+      "lang": "python",
+      "name": "go-counting",
+      "pass1": false,
+      "pass2": false,
+      "secs": 37.8
+    },
+    {
+      "lang": "python",
+      "name": "grade-school",
+      "pass1": false,
+      "pass2": true,
+      "secs": 17.0
+    },
+    {
+      "lang": "python",
+      "name": "grep",
+      "pass1": false,
+      "pass2": false,
+      "secs": 19.2
+    },
+    {
+      "lang": "python",
+      "name": "hangman",
+      "pass1": false,
+      "pass2": false,
+      "secs": 74.0
+    },
+    {
+      "lang": "python",
+      "name": "list-ops",
+      "pass1": false,
+      "pass2": true,
+      "secs": 44.6
+    },
+    {
+      "lang": "python",
+      "name": "paasio",
+      "pass1": false,
+      "pass2": false,
+      "secs": 63.1
+    },
+    {
+      "lang": "python",
+      "name": "phone-number",
+      "pass1": false,
+      "pass2": false,
+      "secs": 29.4
+    },
+    {
+      "lang": "python",
+      "name": "pig-latin",
+      "pass1": true,
+      "pass2": true,
+      "secs": 39.7
+    },
+    {
+      "lang": "python",
+      "name": "poker",
+      "pass1": false,
+      "pass2": true,
+      "secs": 49.1
+    },
+    {
+      "lang": "python",
+      "name": "pov",
+      "pass1": false,
+      "pass2": false,
+      "secs": 125.8
+    },
+    {
+      "lang": "python",
+      "name": "proverb",
+      "pass1": false,
+      "pass2": false,
+      "secs": 23.4
+    },
+    {
+      "lang": "python",
+      "name": "react",
+      "pass1": false,
+      "pass2": false,
+      "secs": 61.9
+    },
+    {
+      "lang": "python",
+      "name": "rest-api",
+      "pass1": false,
+      "pass2": false,
+      "secs": 24.9
+    },
+    {
+      "lang": "python",
+      "name": "robot-name",
+      "pass1": true,
+      "pass2": true,
+      "secs": 10.1
+    },
+    {
+      "lang": "python",
+      "name": "scale-generator",
+      "pass1": false,
+      "pass2": false,
+      "secs": 131.4
+    },
+    {
+      "lang": "python",
+      "name": "sgf-parsing",
+      "pass1": false,
+      "pass2": false,
+      "secs": 133.1
+    },
+    {
+      "lang": "python",
+      "name": "simple-linked-list",
+      "pass1": true,
+      "pass2": true,
+      "secs": 30.9
+    },
+    {
+      "lang": "python",
+      "name": "transpose",
+      "pass1": true,
+      "pass2": true,
+      "secs": 61.7
+    },
+    {
+      "lang": "python",
+      "name": "tree-building",
+      "pass1": false,
+      "pass2": false,
+      "secs": 38.0
+    },
+    {
+      "lang": "python",
+      "name": "two-bucket",
+      "pass1": true,
+      "pass2": true,
+      "secs": 25.1
+    },
+    {
+      "lang": "python",
+      "name": "variable-length-quantity",
+      "pass1": true,
+      "pass2": true,
+      "secs": 51.0
+    },
+    {
+      "lang": "python",
+      "name": "wordy",
+      "pass1": false,
+      "pass2": false,
+      "secs": 51.3
+    },
+    {
+      "lang": "python",
+      "name": "zebra-puzzle",
+      "pass1": true,
+      "pass2": true,
+      "secs": 30.0
+    },
+    {
+      "lang": "python",
+      "name": "zipper",
+      "pass1": false,
+      "pass2": true,
+      "secs": 30.6
+    },
+    {
+      "lang": "javascript",
+      "name": "affine-cipher",
+      "pass1": true,
+      "pass2": true,
+      "secs": 25.2
+    },
+    {
+      "lang": "javascript",
+      "name": "alphametics",
+      "pass1": true,
+      "pass2": true,
+      "secs": 21.9
+    },
+    {
+      "lang": "javascript",
+      "name": "beer-song",
+      "pass1": true,
+      "pass2": true,
+      "secs": 18.7
+    },
+    {
+      "lang": "javascript",
+      "name": "binary",
+      "pass1": true,
+      "pass2": true,
+      "secs": 8.6
+    },
+    {
+      "lang": "javascript",
+      "name": "book-store",
+      "pass1": true,
+      "pass2": true,
+      "secs": 116.2
+    },
+    {
+      "lang": "javascript",
+      "name": "bottle-song",
+      "pass1": true,
+      "pass2": true,
+      "secs": 14.6
+    },
+    {
+      "lang": "javascript",
+      "name": "bowling",
+      "pass1": true,
+      "pass2": true,
+      "secs": 50.8
+    },
+    {
+      "lang": "javascript",
+      "name": "complex-numbers",
+      "pass1": true,
+      "pass2": true,
+      "secs": 8.2
+    },
+    {
+      "lang": "javascript",
+      "name": "connect",
+      "pass1": true,
+      "pass2": true,
+      "secs": 89.5
+    },
+    {
+      "lang": "javascript",
+      "name": "food-chain",
+      "pass1": false,
+      "pass2": true,
+      "secs": 29.8
+    },
+    {
+      "lang": "javascript",
+      "name": "forth",
+      "pass1": true,
+      "pass2": true,
+      "secs": 45.1
+    },
+    {
+      "lang": "javascript",
+      "name": "go-counting",
+      "pass1": true,
+      "pass2": true,
+      "secs": 26.4
+    },
+    {
+      "lang": "javascript",
+      "name": "grade-school",
+      "pass1": true,
+      "pass2": true,
+      "secs": 10.2
+    },
+    {
+      "lang": "javascript",
+      "name": "grep",
+      "pass1": true,
+      "pass2": true,
+      "secs": 28.4
+    },
+    {
+      "lang": "javascript",
+      "name": "house",
+      "pass1": false,
+      "pass2": true,
+      "secs": 37.7
+    },
+    {
+      "lang": "javascript",
+      "name": "killer-sudoku-helper",
+      "pass1": true,
+      "pass2": true,
+      "secs": 16.6
+    },
+    {
+      "lang": "javascript",
+      "name": "ledger",
+      "pass1": true,
+      "pass2": true,
+      "secs": 32.4
+    },
+    {
+      "lang": "javascript",
+      "name": "list-ops",
+      "pass1": true,
+      "pass2": true,
+      "secs": 21.6
+    },
+    {
+      "lang": "javascript",
+      "name": "meetup",
+      "pass1": true,
+      "pass2": true,
+      "secs": 23.1
+    },
+    {
+      "lang": "javascript",
+      "name": "ocr-numbers",
+      "pass1": true,
+      "pass2": true,
+      "secs": 61.4
+    },
+    {
+      "lang": "javascript",
+      "name": "palindrome-products",
+      "pass1": true,
+      "pass2": true,
+      "secs": 18.1
+    },
+    {
+      "lang": "javascript",
+      "name": "parallel-letter-frequency",
+      "pass1": true,
+      "pass2": true,
+      "secs": 17.5
+    },
+    {
+      "lang": "javascript",
+      "name": "phone-number",
+      "pass1": true,
+      "pass2": true,
+      "secs": 22.5
+    },
+    {
+      "lang": "javascript",
+      "name": "pig-latin",
+      "pass1": true,
+      "pass2": true,
+      "secs": 32.7
+    },
+    {
+      "lang": "javascript",
+      "name": "poker",
+      "pass1": false,
+      "pass2": false,
+      "secs": 143.6
+    },
+    {
+      "lang": "javascript",
+      "name": "promises",
+      "pass1": true,
+      "pass2": true,
+      "secs": 21.1
+    },
+    {
+      "lang": "javascript",
+      "name": "queen-attack",
+      "pass1": false,
+      "pass2": true,
+      "secs": 39.8
+    },
+    {
+      "lang": "javascript",
+      "name": "rational-numbers",
+      "pass1": true,
+      "pass2": true,
+      "secs": 23.2
+    },
+    {
+      "lang": "javascript",
+      "name": "react",
+      "pass1": true,
+      "pass2": true,
+      "secs": 49.2
+    },
+    {
+      "lang": "javascript",
+      "name": "rectangles",
+      "pass1": true,
+      "pass2": true,
+      "secs": 26.8
+    },
+    {
+      "lang": "javascript",
+      "name": "resistor-color-trio",
+      "pass1": false,
+      "pass2": true,
+      "secs": 30.2
+    },
+    {
+      "lang": "javascript",
+      "name": "rest-api",
+      "pass1": true,
+      "pass2": true,
+      "secs": 22.0
+    },
+    {
+      "lang": "javascript",
+      "name": "robot-name",
+      "pass1": true,
+      "pass2": true,
+      "secs": 14.8
+    },
+    {
+      "lang": "javascript",
+      "name": "say",
+      "pass1": true,
+      "pass2": true,
+      "secs": 24.2
+    },
+    {
+      "lang": "javascript",
+      "name": "scale-generator",
+      "pass1": false,
+      "pass2": true,
+      "secs": 112.5
+    },
+    {
+      "lang": "javascript",
+      "name": "simple-linked-list",
+      "pass1": true,
+      "pass2": true,
+      "secs": 15.2
+    },
+    {
+      "lang": "javascript",
+      "name": "space-age",
+      "pass1": false,
+      "pass2": true,
+      "secs": 15.0
+    },
+    {
+      "lang": "javascript",
+      "name": "state-of-tic-tac-toe",
+      "pass1": true,
+      "pass2": true,
+      "secs": 18.5
+    },
+    {
+      "lang": "javascript",
+      "name": "sum-of-multiples",
+      "pass1": true,
+      "pass2": true,
+      "secs": 7.2
+    },
+    {
+      "lang": "javascript",
+      "name": "tournament",
+      "pass1": false,
+      "pass2": true,
+      "secs": 48.2
+    }
+  ]
+}
