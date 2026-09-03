@@ -41,22 +41,46 @@ in the server log:
 **Do not use temp 0 / greedy.** Community finding: *"Temp of 0 greatly cripples the
 intelligence of Qwen 3.8."* Also note this stack sets `draft_sample_method=probabilistic`
 for MTP, which is **incompatible with greedy sampling**. Temperature has no measurable
-speed cost (77.5 t/s @ temp 0 vs 77.9 @ temp 1.0).
+speed cost — 77.5 t/s @ temp 0 vs 77.9 @ temp 1.0 (third-party 4090 measurement from
+r/LocalLLM, not ours; we did not A/B temperature for speed).
 
 ## Measured performance (this box)
 
-| Config | prose | code | json | avg |
+Engine comparison below was measured at the old **200 W** cap, vision **off** — kept
+because all engines were measured under identical conditions. Current production
+numbers at 250 W with vision on are in the next section.
+
+| Config (200 W, vision off) | prose | code | json | avg |
 |---|---:|---:|---:|---:|
 | **vLLM W4A16 + MTP n=4, `MAX_SEQS=1`** | 74.5 | **116.4** | 124.1 | **105.0** |
 | llama.cpp Q6_K_XL dual-GPU + MTP | 41.1 | 59.3 | 60.0 | 53.5 |
 | llama.cpp Q3_K_XL 1-GPU + MTP + vision | 36.9 | 52.7 | 53.5 | 47.7 |
 
 MTP speculative-decode acceptance measured live: **58.4%** (matches the ~59–61% others
-report for this stack). Quality: **73.0% pass@2** on the aider polyglot subset
-(n=74, python + javascript).
+report for this stack).
+
+**Quality: 77.0% pass@2** on the aider polyglot subset (n=74, python + javascript),
+at the correct **temp 1.0**. (An earlier 73.0% figure for this same server was run at
+temp 0.6 and is superseded — moving 0.6 → 1.0 alone gained +4.0 points. NInfer scored
+79.7% on the same set at temp 1.0, which is a statistical tie: 59 vs 57 of 74.)
+A full 225-exercise run is in `bench/results/aider-full/`.
+
+### Speed measured at 250 W (user raised the cap 2026-09-02)
+
+| | prose | code | json | avg |
+|---|---:|---:|---:|---:|
+| vision on, **250 W** | 78.6 | **119.8** | 123.9 | **107.4** |
+| vision on, 200 W | 68.7 | 106.4 | 110.9 | 95.3 |
+
+Raising 200 → 250 W gave **+12.7%**. Vision-on at 250 W now beats vision-off at 200 W.
 
 Context: the r/LocalLLaMA consensus band for a single 3090 is 45–75 t/s on 4-bit GGUF
-with MTP; nothing credibly beats ~133 t/s single-stream on this card.
+with MTP, so this stack is well above the community norm. Third-hand reports of
+~120–133 t/s exist for this repo's own configs (its README quotes 121 t/s MTP /
+126 DFlash2, and a "8 real chat prompts" row reaching 133) — **we have not
+reproduced 133, and that row's methodology is ambiguous (possibly batched, not
+single-stream). Treat 133 as an unverified vendor figure, not a target.** Our own
+best measured single-stream is 119.8 t/s on code at 250 W.
 
 ## GPU 0 — the production stack (full run command)
 
