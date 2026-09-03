@@ -1,0 +1,3 @@
+{"lang": "python", "name": "affine-cipher", "pass1": true, "pass2": true, "secs": 16.7, "malformed": false}
+{"lang": "python", "name": "beer-song", "pass1": false, "pass2": false, "secs": 20.4, "malformed": false}
+{"lang": "python", "name": "book-store", "pass1": false, "pass2": true, "secs": 124.4, "malformed": true}

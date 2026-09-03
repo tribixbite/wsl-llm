@@ -193,7 +193,11 @@ Secrets auto-generated with `openssl rand` if not provided as install args.
 - **ASPM must be disabled in BIOS** — causes CUDA crash (error 999) after idle periods
 - **262k context is stable** on a single GPU thanks to turbo3 KV (3.125 bpv, ~5× compression vs q8_0); only 10/40 layers have KV cache (DeltaNet)
 - **Speculative decoding is net-negative** on Qwen3.6-35B-A3B + RTX 3090 (verified via thc1006 benchmark)
-- **`-sm graph` is USELESS on PCIe** — 10 t/s (only helps NVLink); always use layer split
+- ⚠️ **`-sm graph` "useless on PCIe, 10 t/s" is UNRELIABLE** — flagged stale 2026-09-02.
+  ikawrakow benchmarks `-sm graph` favourably on PCIe 2×3090, so our 10 t/s figure was
+  most likely a misconfiguration or an old build, not a real dead end. **Re-test before
+  citing it.** Separately, `-sm tensor` (merged 2026-04-09) is 42% *slower* than layer
+  split on the maintainer's own 2×4090 bench, and forbids KV quantization.
 - **vLLM TP=2 is 7x slower** on PCIe; always use TP=1
 - **vLLM needs nightly 0.17.0rc1+** for Qwen3.5/3.6 support
 - **Vulkan not available in WSL2** — NVIDIA only provides CUDA/D3D12
